@@ -13,9 +13,16 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    # macos-15 ships Xcode 16+, required because current XcodeGen emits
+    # objectVersion 77 (Xcode 16 format). macos-14 defaults to 15.4 and fails.
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
+
+      - name: Select Xcode 16
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: "16"
 
       - name: Show Xcode version
         run: xcodebuild -version
