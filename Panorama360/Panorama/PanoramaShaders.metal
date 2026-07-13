@@ -5,7 +5,7 @@
 //
 
 #include <metal_stdlib>
-#include "ShaderTypes.h"
+#include "../Viewer/ShaderTypes.h"
 
 using namespace metal;
 
