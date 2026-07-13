@@ -1,31 +1,101 @@
-# Panorama360
+<p align="center">
+  <img src="docs/assets/banner.svg" alt="Panorama360" width="100%"/>
+</p>
 
-App nativo iOS que captura panoramas **360° profissionais** guiando o usuário por uma esfera de pontos virtuais. Cada ponto alinhado dispara automaticamente quando o aparelho está estável e em foco; as fotos são costuradas numa imagem equiretangular e abertas num viewer 360° interativo.
+<p align="center">
+  <strong>Captura 360° guiada no iPhone</strong> — pontos no espaço, disparo automático, stitch Metal e viewer interativo.
+</p>
 
-**Escopo v1:** captura + costura (stitch) + viewer. Feed / login / marketplace / tokens / IA / social / backend ficam de fora de propósito — as costuras entre módulos estão limpas para eles.
+<p align="center">
+  <a href="https://github.com/Igorrv/panorama360/actions/workflows/build-ipa.yml"><img src="https://github.com/Igorrv/panorama360/actions/workflows/build-ipa.yml/badge.svg" alt="Build IPA"/></a>
+  <img src="https://img.shields.io/badge/iOS-16%2B-black?logo=apple" alt="iOS 16+"/>
+  <img src="https://img.shields.io/badge/Swift-5.9-F05138?logo=swift&logoColor=white" alt="Swift 5.9"/>
+  <img src="https://img.shields.io/badge/Metal-stitch%20%2B%20viewer-38BDF8" alt="Metal"/>
+  <img src="https://img.shields.io/badge/license-MIT-22C55E" alt="MIT"/>
+  <a href="https://github.com/Igorrv/panorama360/releases"><img src="https://img.shields.io/badge/IPA-GitHub%20Actions-111827" alt="IPA via Actions"/></a>
+</p>
 
-[English docs](#stack) · [Como o sistema funciona (PT)](docs/Sistema.md) · [Architecture](docs/Architecture.md)
+<p align="center">
+  <a href="#instalar-sem-mac-windows">Instalar no Windows</a> ·
+  <a href="#instalar-com-mac">Instalar com Mac</a> ·
+  <a href="docs/Sistema.md">Como funciona</a> ·
+  <a href="docs/Architecture.md">Arquitetura</a> ·
+  <a href="#baixar-o-ipa">Baixar IPA</a>
+</p>
 
 ---
 
-## Stack
+## O que é
 
-SwiftUI · ARKit · RealityKit · AVFoundation · CoreMotion · Metal · CoreImage · Vision · Accelerate (vImage). OpenCV opcional. MVVM + Clean Architecture + Swift Concurrency (`actor`s, `AsyncStream`).
+**Panorama360** transforma um iPhone comum numa câmera 360°: você gira no lugar, o app guia com pontos flutuantes sobre a câmera, dispara sozinho quando está alinhado/estável/nítido, costura tudo numa imagem equiretangular e abre um viewer Metal (arrastar, pinça, giroscópio).
 
-| | |
-|--|--|
-| **Deployment mínimo** | iOS 16.0, só iPhone |
-| **Dispositivo** | iPhone físico com ARKit world tracking (A11+ recomendado) |
-| **Bundle ID** | `com.teleport.panorama360` |
-| **Projeto Xcode** | Gerado por [XcodeGen](https://github.com/yonaskolb/XcodeGen) a partir de `project.yml` |
-
-O simulador **não** serve (sem câmera / ARKit).
+| Incluído na v1 | Fora de escopo (por enquanto) |
+|----------------|-------------------------------|
+| Onboarding + primeira sala (8 pontos) | Login / feed / social |
+| Captura guiada + auto-shutter | Marketplace / tokens |
+| Stitch Metal (orientação ARKit/CoreMotion) | Backend / nuvem / IA |
+| Viewer 360° interativo | OpenCV (opcional — ver docs) |
 
 ---
 
-## Dois caminhos para rodar
+## Destaques
 
-### A) Você tem Mac
+- **Guia visual** — esfera de pontos projetada no preview ao vivo
+- **Disparo inteligente** — `CaptureGate` (ângulo + estabilidade + foco + nitidez)
+- **Stitch determinístico** — warp pela orientação conhecida, sem feature-matching cego
+- **Viewer GPU** — shaders Metal na esfera equiretangular
+- **Windows-friendly** — IPA na nuvem (Actions) + Sideloadly no PC
+- **Diagnóstico** — `CrashReporter` persiste a última falha (útil em sideload sem Mac)
+
+---
+
+## Pipeline
+
+```mermaid
+flowchart LR
+  A[Câmera + Motion] --> B[CaptureGuide]
+  B --> C{CaptureGate}
+  C -->|ready| D[Foto HEIC + quatérnio]
+  D --> E[SessionStore]
+  E --> F[PanoramaEngine / Metal]
+  F --> G[Equiretangular]
+  G --> H[Viewer 360°]
+```
+
+1. Preview em tela cheia  
+2. Pontos: verde → amarelo → azul (alinhado)  
+3. Retículo verde + aparelho parado → foto automática  
+4. Último ponto → stitch → viewer  
+
+Detalhes: [`docs/Sistema.md`](docs/Sistema.md) · [`docs/Architecture.md`](docs/Architecture.md)
+
+---
+
+## Baixar o IPA
+
+Cada push em `main` gera um artifact **não assinado**:
+
+1. Abra **[Actions → Build IPA](https://github.com/Igorrv/panorama360/actions/workflows/build-ipa.yml)**  
+2. Entre no run **verde** mais recente  
+3. Baixe **Panorama360-unsigned-ipa** → descompacte → `Panorama360-unsigned.ipa`
+
+> Repo **público** = minutos macOS do Actions ilimitados e grátis.
+
+---
+
+## Instalar sem Mac (Windows)
+
+```text
+IPA (Actions)  →  Sideloadly + Apple ID  →  USB  →  Trust no iPhone
+```
+
+Guia completo: **[`docs/InstallingOnWindows.md`](docs/InstallingOnWindows.md)**
+
+Instalação grátis dura **7 dias** (limite do Apple ID). Reinstale o IPA para renovar.
+
+---
+
+## Instalar com Mac
 
 ```bash
 brew install xcodegen
@@ -34,66 +104,45 @@ xcodegen generate
 open Panorama360.xcodeproj
 ```
 
-Assine com sua Apple Team → iPhone físico → ⌘R.  
-Guia completo: [`docs/BuildingOnMac.md`](docs/BuildingOnMac.md).
+Assine com sua Team → iPhone físico → ⌘R.  
+Guia: [`docs/BuildingOnMac.md`](docs/BuildingOnMac.md)
 
-### B) Só Windows (sem Mac)
-
-O GitHub Actions (runner `macos-14`) compila o IPA na nuvem; no PC você assina e instala com **Sideloadly**.
-
-1. Push deste repo no GitHub (**público** = minutos de build macOS ilimitados e grátis).
-2. Aba **Actions** → workflow **Build IPA** (~5–8 min) → baixe o artifact `Panorama360-unsigned-ipa`.
-3. Sideloadly + Apple ID grátis → USB → Trust no iPhone.
-
-Passo a passo: [`docs/InstallingOnWindows.md`](docs/InstallingOnWindows.md).
+> O simulador **não** serve (sem câmera / ARKit).
 
 ---
 
-## Como funciona (resumo)
+## Stack
 
-1. Câmera em tela cheia, UI estilo Apple.
-2. ARKit world-tracking + `CaptureGuide` projetam **60–100 pontos** em bandas de latitude **sobre a imagem ao vivo** (intrínsecos reais do ARKit).
-3. Ponto: **verde** (idle) → **amarelo** (perto) → **azul** (alinhado). Retículo: branco → amarelo → **verde**.
-4. Alinhado **e** estável **e** nítido → captura automática (haptic + pulse).
-5. Barra: progresso (`28 de 80`) + ETA.
-6. Último ponto → `PanoramaEngine`: undistort → match de exposição → projeção esférica Metal → equiretangular → disco.
-7. Viewer 360°: arrastar, pinça, giroscópio.
-
-### Por que o stitch padrão é “puro Apple”
-
-O ARKit grava a **orientação exata** de cada foto; cada JPEG é projetado na esfera pela rotação — sem feature-matching cego. Mais robusto que um stitcher clássico e zero dependências de terceiros. OpenCV opcional: [`docs/OpenCVIntegration.md`](docs/OpenCVIntegration.md).
-
-Detalhes do pipeline e camadas: [`docs/Architecture.md`](docs/Architecture.md) · visão em PT: [`docs/Sistema.md`](docs/Sistema.md).
+| Item | Valor |
+|------|--------|
+| UI | SwiftUI |
+| Captura | AVFoundation · CoreMotion · (ARKit opcional no path alternativo) |
+| Stitch / Viewer | Metal · CoreImage · Accelerate |
+| Arquitetura | MVVM + Clean + Swift Concurrency |
+| iOS mínimo | **16.0** (iPhone) |
+| Bundle ID | `com.teleport.panorama360` |
+| Projeto Xcode | [XcodeGen](https://github.com/yonaskolb/XcodeGen) ← `project.yml` |
 
 ---
 
-## Layout do projeto
+## Estrutura
 
-```
+```text
 Panorama360/
-├─ project.yml                      # fonte de verdade do target Xcode
-├─ README.md
-├─ LICENSE · CONTRIBUTING.md
-├─ .github/workflows/build-ipa.yml  # CI → IPA não assinado
-├─ docs/
-│  ├─ Sistema.md                    # visão geral em português
-│  ├─ Architecture.md               # camadas, gate, pipelines
-│  ├─ BuildingOnMac.md
-│  ├─ InstallingOnWindows.md
-│  └─ OpenCVIntegration.md
+├─ project.yml
+├─ .github/workflows/build-ipa.yml
+├─ docs/          Sistema · Architecture · install guides
 └─ Panorama360/
-   ├─ App/                          # @main + AppRouter
-   ├─ Domain/                       # modelos puros
-   ├─ Device/{Camera,Motion,AR,Capture}/
-   ├─ Guide/                        # esfera + alinhamento
-   ├─ Panorama/                     # stitch Metal (+ OpenCV opcional)
-   ├─ Viewer/                       # renderer Metal + shaders
-   ├─ Presentation/                 # ViewModels
-   ├─ UI/                           # SwiftUI
-   └─ Utilities/                    # math, storage, haptics, blur, log
+   ├─ App/           @main · AppRouter · onboarding
+   ├─ Domain/        modelos puros
+   ├─ Device/        Camera · Motion · AR · CaptureGate
+   ├─ Guide/         esfera de pontos + alinhamento
+   ├─ Panorama/      stitch Metal (+ OpenCV opcional)
+   ├─ Viewer/        renderer Metal + shaders
+   ├─ Presentation/  ViewModels
+   ├─ UI/            SwiftUI (Onboarding, Capture, Viewer…)
+   └─ Utilities/     storage · crash · blur · math
 ```
-
-Cada arquivo fica sob ~400 linhas.
 
 ---
 
@@ -101,21 +150,20 @@ Cada arquivo fica sob ~400 linhas.
 
 | Doc | Conteúdo |
 |-----|----------|
-| [Sistema.md](docs/Sistema.md) | Explicação do produto e do pipeline (PT) |
-| [Architecture.md](docs/Architecture.md) | Camadas, CaptureGate, concorrência |
-| [BuildingOnMac.md](docs/BuildingOnMac.md) | XcodeGen, signing, build Release |
+| [Sistema.md](docs/Sistema.md) | Produto e pipeline (PT) |
+| [Architecture.md](docs/Architecture.md) | Camadas, gate, concorrência |
+| [BuildingOnMac.md](docs/BuildingOnMac.md) | XcodeGen + signing |
 | [InstallingOnWindows.md](docs/InstallingOnWindows.md) | Actions + Sideloadly |
-| [OpenCVIntegration.md](docs/OpenCVIntegration.md) | Stitcher opcional com OpenCV |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | Regras de PR e estilo |
+| [OpenCVIntegration.md](docs/OpenCVIntegration.md) | Stitcher opcional |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | PRs e estilo |
+| [CHANGELOG.md](CHANGELOG.md) | Histórico de versões |
 
 ---
 
-## Notas
+## Qualidade da captura
 
-- O código foi escrito sem toolchain Swift no Windows; espere ajustes menores de assinatura de API no primeiro build no Xcode.
-- Qualidade final do 360 depende da higiene de captura: gire devagar, boa luz, sobreposição entre pontos.
-- IPA via Actions é **não assinado** de propósito — o Sideloadly (ou Xcode) assina com a sua conta.
+Gire **devagar**, boa luz, telefone **na vertical** na altura do peito. Sobreposição entre pontos importa mais do que velocidade.
 
 ## Licença
 
-[MIT](LICENSE)
+[MIT](LICENSE) © Teleport / Panorama360 contributors

@@ -113,6 +113,54 @@ public final class CaptureViewModel: ObservableObject {
         onCancel?()
     }
 
+    /// Suspends camera + motion when the app is backgrounded. iOS kills apps
+    /// that keep the camera running while suspended — this is a prime cause of
+    /// "the app just closes". Safe to call repeatedly / before start.
+    public func suspend() {
+        evaluateTask?.cancel()
+        evaluateTask = nil
+        motion.stop()
+        camera.stop()
+    }
+
+    /// Resumes after foregrounding. Re-primes the motion reference so the
+    /// guidance baseline matches the device's current pose (no jump).
+    public func resume() {
+        guard isReady, session != nil else { return }
+        motion.resetReference()
+        do {
+            try motion.start()
+        } catch {
+            errorMessage = "Motion sensors unavailable."
+            return
+        }
+        Task { try? await camera.start() }
+        startEvaluating()
+    }
+
+    /// Manual escape hatch: stop capturing and proceed to stitching with
+    /// whatever photos were taken (≥1). Guarantees the user can always reach
+    /// the viewer even if the auto-gate is slow to fire.
+    public func finishCapture() {
+        guard let session else {
+            errorMessage = "Session not started yet."
+            return
+        }
+        guard guide.capturedCount >= 1 else {
+            errorMessage = "Capture at least one point before finishing (aim at a glowing dot and hold still)."
+            return
+        }
+        evaluateTask?.cancel()
+        evaluateTask = nil
+        motion.stop()
+        camera.stop()
+        Haptics.shared.captured()
+        onComplete?(session)
+    }
+
+    /// True when there is at least one photo to stitch (enables the Finish button).
+    public var canFinish: Bool { guide.capturedCount >= 1 }
+
     /// Clears the current error banner.
     public func dismissError() { errorMessage = nil }
 

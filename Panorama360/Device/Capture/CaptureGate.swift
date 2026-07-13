@@ -53,9 +53,14 @@ public struct CaptureGate: Sendable {
     public var requireFocusSettled: Bool
     public var requireExposureSettled: Bool
 
-    public init(alignedDistance: Double = radians(4.5),
-                minSharpness: Float = 25,
-                minStability: Double = 0.72,
+    /// Defaults tuned so a hand-held phone can realistically satisfy all
+    /// conditions at once: ~7° alignment window, moderate stability, and
+    /// focus/exposure simply *settled* (which they are ~0.5 s after you stop
+    /// moving). The earlier 4.5°/0.72 combo almost never coincided → the gate
+    /// never fired → "scanning didn't work".
+    public init(alignedDistance: Double = radians(7),
+                minSharpness: Float = 12,
+                minStability: Double = 0.5,
                 requireFocusSettled: Bool = true,
                 requireExposureSettled: Bool = true) {
         self.alignedDistance = alignedDistance

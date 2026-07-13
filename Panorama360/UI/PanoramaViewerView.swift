@@ -56,14 +56,25 @@ struct PanoramaViewerView: View {
     private var topBar: some View {
         HStack {
             Button {
+                // Leaving the viewer after the tutorial room = onboarding done →
+                // full capture mode unlocked for all future launches.
+                if router.tutorialActive { router.completeOnboarding() }
                 router.goCapture()
             } label: {
-                Label("New", systemImage: "chevron.left")
-                    .labelStyle(.iconOnly)
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 44, height: 44)
-                    .glassPanel(cornerRadius: 22)
+                if router.tutorialActive {
+                    Label("Done", systemImage: "checkmark")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 14).frame(height: 44)
+                        .glassPanel(cornerRadius: 22)
+                } else {
+                    Label("New", systemImage: "chevron.left")
+                        .labelStyle(.iconOnly)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .glassPanel(cornerRadius: 22)
+                }
             }
             Spacer()
             Button {

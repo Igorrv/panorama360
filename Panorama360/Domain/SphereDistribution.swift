@@ -34,4 +34,15 @@ public struct SphereDistribution: Codable, Equatable, Sendable {
         overlap: 0.5,
         includePoles: true
     )
+
+    /// Tiny preset for the onboarding "first room": a single horizon band, ~8
+    /// points, no poles. Completes in a minute or two and lets a first-time
+    /// user see the whole capture → stitch → viewer loop succeed end-to-end.
+    /// Rotate slowly in place at chest height; no need to tilt up/down.
+    public static let tutorial = SphereDistribution(
+        pitchBands: [0],
+        yawStep: radians(45),
+        overlap: 0.4,
+        includePoles: false
+    )
 }

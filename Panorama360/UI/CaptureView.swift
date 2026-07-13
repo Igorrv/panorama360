@@ -7,6 +7,7 @@ struct CaptureView: View {
 
     @StateObject private var vm: CaptureViewModel
     @EnvironmentObject private var router: AppRouter
+    @Environment(\.scenePhase) private var scenePhase
     @State private var didStart = false
     /// Persisted crash note from the previous launch (nil if none). Shown as a
     /// banner so the cause of a silent crash is recoverable without a Mac console.
@@ -39,10 +40,16 @@ struct CaptureView: View {
                                     total: vm.totalPoints,
                                     eta: vm.etaSeconds,
                                     stability: vm.stabilityScore)
+                    if vm.canFinish {
+                        finishButton
+                            .padding(.top, 14)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
                 .padding(.bottom, 28)
+                .animation(.easeInOut(duration: 0.25), value: vm.canFinish)
 
                 if let lastCrash {
                     crashBanner(lastCrash)
@@ -57,8 +64,18 @@ struct CaptureView: View {
                 didStart = true
                 vm.setViewport(geo.size)
                 vm.onComplete = { router.goStitching($0) }
-                vm.onCancel = { router.goCapture() }
+                // From the tutorial, cancel returns to onboarding; otherwise a fresh capture.
+                vm.onCancel = {
+                    if router.tutorialActive { router.goOnboarding() } else { router.goCapture() }
+                }
                 Task { await vm.start() }
+            }
+            // Stop the camera the instant the app is backgrounded — iOS kills
+            // apps that keep capturing while suspended (a major "app just closes"
+            // cause). Restart on return.
+            .onChange(of: scenePhase) { phase in
+                if phase == .background { vm.suspend() }
+                else if phase == .active { vm.resume() }
             }
             .alert("Capture Error", isPresented: Binding(
                 get: { vm.errorMessage != nil },
@@ -93,6 +110,23 @@ struct CaptureView: View {
                 .overlay(Circle().stroke(.white.opacity(0.2), lineWidth: 1))
         }
         .shadow(color: .black.opacity(0.4), radius: 6)
+    }
+
+    /// Manual escape hatch: build the 360° view now with the photos taken so far
+    /// (appears after the first capture). Lets the user reach the viewer even if
+    /// the auto-gate is slow.
+    private var finishButton: some View {
+        Button {
+            vm.finishCapture()
+        } label: {
+            Label("Finish & build 360°", systemImage: "checkmark.circle.fill")
+                .font(.system(size: 16, weight: .semibold, design: .rounded))
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(.blue.gradient, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .shadow(color: .blue.opacity(0.4), radius: 10)
+        }
     }
 
     // MARK: - Crash banner

@@ -201,6 +201,11 @@ public final class CameraEngine: NSObject {
     // MARK: - Capture
 
     /// Captures a single full-resolution HDR HEIC photo.
+    ///
+    /// A 6 s timeout guarantees the continuation resumes even if AVFoundation
+    /// never calls back (interrupted capture / session reset / backgrounding) —
+    /// otherwise the delegate would deinit with an unresumed `CheckedContinuation`
+    /// and trap. The delegate tolerates the late callback via `hasResolved`.
     public func capturePhoto() async throws -> AVCapturePhoto {
         guard let photoOutput else { throw CameraError.configurationFailed("photo output not ready") }
         let settings = makePhotoSettings(output: photoOutput)
@@ -208,6 +213,9 @@ public final class CameraEngine: NSObject {
             // The photo output retains the delegate for the duration of the capture.
             let delegate = PhotoCaptureDelegate(continuation: continuation)
             photoOutput.capturePhoto(with: settings, delegate: delegate)
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 6.0) {
+                delegate.timeoutResume()
+            }
         }
     }
 

@@ -9,8 +9,11 @@ struct RootView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             switch router.route {
+            case .onboarding:
+                OnboardingView()
+                    .transition(.opacity)
             case .capture:
-                CaptureView()
+                CaptureView(distribution: router.tutorialActive ? .tutorial : .default)
                     .id(router.captureGeneration)
                     .transition(.opacity)
             case .stitching(let session):
@@ -26,6 +29,7 @@ struct RootView: View {
 
     private func routeTag(_ route: AppRouter.Route) -> String {
         switch route {
+        case .onboarding: return "onboarding"
         case .capture: return "capture"
         case .stitching: return "stitching"
         case .viewer: return "viewer"

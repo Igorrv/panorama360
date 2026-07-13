@@ -28,10 +28,11 @@ public struct AlignmentThresholds: Sendable, Equatable {
         self.alignedDistance = alignedDistance
     }
 
-    /// Default tuned for ~60° horizontal FOV phone lens with overlap.
+    /// Default tuned to match the relaxed `CaptureGate` window so the reticle
+    /// turns "aligned" at the same moment the gate is allowed to fire.
     public static let `default` = AlignmentThresholds(
-        nearDistance: radians(22),     // ~22°
-        alignedDistance: radians(4.5)  // ~4.5°
+        nearDistance: radians(26),    // ~26°
+        alignedDistance: radians(7)   // ~7°  (matches CaptureGate.alignedDistance)
     )
 
     /// Resolve a state from an angular distance to target.
