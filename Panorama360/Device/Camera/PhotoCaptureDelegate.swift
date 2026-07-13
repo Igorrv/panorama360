@@ -25,7 +25,7 @@ final class PhotoCaptureDelegate: NSObject, AVCapturePhotoCaptureDelegate {
 
     func photoOutput(_ output: AVCapturePhotoOutput,
                      willBeginCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings) {
-        Log.camera.debug("Capture begin: \(resolvedSettings.expectedPhotoDimensions.width)×\(resolvedSettings.expectedPhotoDimensions.height)")
+        Log.camera.debug("Capture begin for uniqueID \(resolvedSettings.uniqueID)")
     }
 
     func photoOutput(_ output: AVCapturePhotoOutput,

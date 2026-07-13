@@ -64,7 +64,7 @@ public actor CaptureManager {
     }
 
     private static func photoDimensions(_ photo: AVCapturePhoto) -> (Int, Int) {
-        if let cg = photo.cgImageRepresentation()?.takeUnretainedValue() {
+        if let cg = photo.cgImageRepresentation() {
             return (cg.width, cg.height)
         }
         if let data = photo.fileDataRepresentation(),
