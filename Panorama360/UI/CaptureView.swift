@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// The main capture screen: live camera, floating guide points, central reticle,
 /// progress bar, stability indicator and a cancel button.
@@ -7,6 +8,10 @@ struct CaptureView: View {
     @StateObject private var vm: CaptureViewModel
     @EnvironmentObject private var router: AppRouter
     @State private var didStart = false
+    /// Persisted crash note from the previous launch (nil if none). Shown as a
+    /// banner so the cause of a silent crash is recoverable without a Mac console.
+    @State private var lastCrash: String? = CrashReporter.lastCrash()
+    @State private var didCopyCrash = false
 
     init(distribution: SphereDistribution = .default) {
         _vm = StateObject(wrappedValue: CaptureViewModel(distribution: distribution))
@@ -38,6 +43,14 @@ struct CaptureView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 10)
                 .padding(.bottom, 28)
+
+                if let lastCrash {
+                    crashBanner(lastCrash)
+                        .padding(.horizontal, 20)
+                        .padding(.top, 10)
+                        .frame(maxHeight: .infinity, alignment: .top)
+                        .allowsHitTesting(true)
+                }
             }
             .onAppear {
                 guard !didStart else { return }
@@ -80,6 +93,60 @@ struct CaptureView: View {
                 .overlay(Circle().stroke(.white.opacity(0.2), lineWidth: 1))
         }
         .shadow(color: .black.opacity(0.4), radius: 6)
+    }
+
+    // MARK: - Crash banner
+
+    /// Shows the persisted reason the previous launch crashed, with Copy (to
+    /// paste into a message to the dev / a bug report) and Dismiss. The text is
+    /// scrollable because the call stack can be long.
+    private func crashBanner(_ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.yellow)
+                Text("Previous launch crashed")
+                    .font(.system(size: 13, weight: .bold))
+                Spacer()
+            }
+            ScrollView {
+                Text(text)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 160)
+
+            HStack(spacing: 10) {
+                Button {
+                    UIPasteboard.general.string = text
+                    didCopyCrash = true
+                } label: {
+                    Label(didCopyCrash ? "Copied" : "Copy",
+                          systemImage: didCopyCrash ? "checkmark" : "doc.on.doc")
+                        .font(.system(size: 12, weight: .semibold))
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                }
+                .buttonStyle(.bordered)
+                .tint(.white)
+
+                Button {
+                    CrashReporter.clear()
+                    lastCrash = nil
+                } label: {
+                    Label("Dismiss", systemImage: "xmark")
+                        .font(.system(size: 12, weight: .semibold))
+                        .padding(.horizontal, 12).padding(.vertical, 6)
+                }
+                .buttonStyle(.bordered)
+                .tint(.white)
+            }
+        }
+        .padding(14)
+        .background(.red.opacity(0.85), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .stroke(.white.opacity(0.2), lineWidth: 1))
+        .shadow(color: .black.opacity(0.5), radius: 10)
     }
 }
 

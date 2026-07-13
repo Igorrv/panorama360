@@ -16,12 +16,14 @@ public final class CameraEngine: NSObject {
     public enum CameraError: LocalizedError {
         case unauthorized
         case noRearCamera
-        case configurationFailed
+        case configurationFailed(String)
+        case runtimeError(String)
         public var errorDescription: String? {
             switch self {
             case .unauthorized: return "Camera permission not granted."
             case .noRearCamera: return "No rear camera available on this device."
-            case .configurationFailed: return "Failed to configure the camera session."
+            case .configurationFailed(let detail): return "Failed to configure the camera session: \(detail)"
+            case .runtimeError(let detail): return "Camera runtime error: \(detail)"
             }
         }
     }
@@ -30,13 +32,22 @@ public final class CameraEngine: NSObject {
     public let previewLayer: AVCaptureVideoPreviewLayer
 
     private let sessionQueue = DispatchQueue(label: "com.teleport.camera.session")
+    /// Retained for the lifetime of the engine. AVCaptureVideoDataOutput does NOT
+    /// retain the delegate queue, so it must be stored as a property. (A previous
+    /// inline queue was released as soon as `configure()` returned, then the first
+    /// delivered frame dispatched into freed memory → crash ~2–3s after start.)
+    private let videoQueue = DispatchQueue(label: "com.teleport.camera.video")
     private var photoOutput: AVCapturePhotoOutput?
     private var videoOutput: AVCaptureVideoDataOutput?
     private(set) var videoDevice: AVCaptureDevice?
     private var sampleProxy = SampleBufferProxy()
+    private var configured = false
 
     /// Latest sharpness score computed from the video stream (updated ~camera fps).
     public var onSharpness: ((Float) -> Void)?
+    /// Fired when the session reports a runtime error (hardware reset, etc.).
+    public var onRuntimeError: ((String) -> Void)?
+    public private(set) var lastRuntimeError: String?
     /// Latest captured image buffer (for the live-preview/blur gate).
     public private(set) var latestPixelBuffer: CVPixelBuffer?
 
@@ -48,9 +59,26 @@ public final class CameraEngine: NSObject {
         sampleProxy.handler = { [weak self] buffer in
             self?.handleSampleBuffer(buffer)
         }
+        // Surface session failures (e.g. media services reset) instead of dying.
+        NotificationCenter.default.addObserver(
+            forName: .AVCaptureSessionRuntimeError,
+            object: session, queue: .main) { [weak self] note in
+            let detail = (note.userInfo?[AVCaptureSessionErrorKey] as? Error)?.localizedDescription
+                ?? "Unknown capture session error."
+            self?.lastRuntimeError = detail
+            self?.onRuntimeError?(detail)
+        }
     }
 
-    // MARK: - Lifecycle
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+        let session = self.session
+        sessionQueue.async {
+            if session.isRunning { session.stopRunning() }
+        }
+    }
+
+    // MARK: - Authorization
 
     public func requestAuthorization() async -> Bool {
         switch AVCaptureDevice.authorizationStatus(for: .video) {
@@ -61,11 +89,26 @@ public final class CameraEngine: NSObject {
         }
     }
 
-    public func start() {
-        sessionQueue.async { [weak self] in
-            self?.configure()
-            guard self?.session.isRunning == false else { return }
-            self?.session.startRunning()
+    // MARK: - Lifecycle
+
+    /// Configures (once) and starts the session. Throws on configuration or
+    /// runtime failure so the caller can surface it to the UI instead of leaving
+    /// a dead black screen.
+    public func start() async throws {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            sessionQueue.async { [weak self] in
+                guard let self else {
+                    continuation.resume(throwing: CameraError.configurationFailed("engine released"))
+                    return
+                }
+                do {
+                    if !self.configured { try self.configure(); self.configured = true }
+                    if !self.session.isRunning { self.session.startRunning() }
+                    continuation.resume()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
         }
     }
 
@@ -78,41 +121,45 @@ public final class CameraEngine: NSObject {
 
     // MARK: - Configuration
 
-    private func configure() {
+    private func configure() throws {
         session.beginConfiguration()
         defer { session.commitConfiguration() }
 
-        session.sessionPreset = .photo
+        // Clean any prior wiring (safe if configure is ever re-run).
+        for input in session.inputs { session.removeInput(input) }
+        for output in session.outputs { session.removeOutput(output) }
 
-        // Rear wide camera.
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera,
                                                    for: .video, position: .back) else {
-            Log.camera.error("No rear wide camera.")
-            return
+            throw CameraError.noRearCamera
         }
         videoDevice = device
 
+        let input: AVCaptureDeviceInput
         do {
-            let input = try AVCaptureDeviceInput(device: device)
-            if session.canAddInput(input) { session.addInput(input) }
+            input = try AVCaptureDeviceInput(device: device)
         } catch {
-            Log.camera.error("Input error: \(error.localizedDescription, privacy: .public)")
-            return
+            throw CameraError.configurationFailed("device input: \(error.localizedDescription)")
         }
+        guard session.canAddInput(input) else {
+            throw CameraError.configurationFailed("cannot add camera input")
+        }
+        session.addInput(input)
 
         // Photo output (HDR HEIC).
         let photoOutput = AVCapturePhotoOutput()
-        if session.canAddOutput(photoOutput) {
-            session.addOutput(photoOutput)
-            photoOutput.maxPhotoQualityPrioritization = .quality
-            // Store photos upright (portrait) so the stitcher can load raw pixels
-            // without worrying about EXIF rotation.
-            if let connection = photoOutput.connection(with: .video) {
-                if #available(iOS 17.0, *) {
-                    connection.videoRotationAngle = 90 // portrait
-                } else {
-                    connection.videoOrientation = .portrait
-                }
+        guard session.canAddOutput(photoOutput) else {
+            throw CameraError.configurationFailed("cannot add photo output")
+        }
+        session.addOutput(photoOutput)
+        photoOutput.maxPhotoQualityPrioritization = .quality
+        // Store photos upright (portrait) so the stitcher loads raw pixels with
+        // no EXIF-rotation handling.
+        if let connection = photoOutput.connection(with: .video) {
+            if #available(iOS 17.0, *) {
+                connection.videoRotationAngle = 90 // portrait
+            } else {
+                connection.videoOrientation = .portrait
             }
         }
         self.photoOutput = photoOutput
@@ -123,11 +170,11 @@ public final class CameraEngine: NSObject {
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
         ]
         videoOutput.alwaysDiscardsLateVideoFrames = true
-        if session.canAddOutput(videoOutput) {
-            session.addOutput(videoOutput)
-            videoOutput.setSampleBufferDelegate(sampleProxy,
-                                                queue: DispatchQueue(label: "com.teleport.camera.video"))
+        guard session.canAddOutput(videoOutput) else {
+            throw CameraError.configurationFailed("cannot add video output")
         }
+        session.addOutput(videoOutput)
+        videoOutput.setSampleBufferDelegate(sampleProxy, queue: videoQueue)
         self.videoOutput = videoOutput
 
         configureDeviceControls(device)
@@ -155,7 +202,7 @@ public final class CameraEngine: NSObject {
 
     /// Captures a single full-resolution HDR HEIC photo.
     public func capturePhoto() async throws -> AVCapturePhoto {
-        guard let photoOutput else { throw CameraError.configurationFailed }
+        guard let photoOutput else { throw CameraError.configurationFailed("photo output not ready") }
         let settings = makePhotoSettings(output: photoOutput)
         return try await withCheckedThrowingContinuation { continuation in
             // The photo output retains the delegate for the duration of the capture.

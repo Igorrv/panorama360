@@ -57,6 +57,9 @@ public final class CaptureViewModel: ObservableObject {
         self.captureManager = CaptureManager(camera: camera, store: store)
         let lock = sharpnessLock
         camera.onSharpness = { score in lock.withLock { $0 = score } }
+        camera.onRuntimeError = { [weak self] detail in
+            Task { @MainActor in self?.errorMessage = "Camera error: \(detail)" }
+        }
     }
 
     // MARK: - Lifecycle
@@ -77,7 +80,12 @@ public final class CaptureViewModel: ObservableObject {
             return
         }
 
-        camera.start()
+        do {
+            try await camera.start()
+        } catch {
+            errorMessage = "Camera could not start: \(error.localizedDescription)"
+            return
+        }
         Haptics.shared.prepare()
 
         motion.onUpdate = { [weak self] orient in
