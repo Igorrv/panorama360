@@ -11,26 +11,12 @@ import Foundation
 /// fire — for those, read the `.ips` crash log on the device.
 public enum CrashReporter {
 
-    private static var fileName: String { "last_crash.txt" }
+    fileprivate static let fileName = "last_crash.txt"
 
     /// Installs the handler. Call once at app launch (before any camera work).
     public static func install() {
-        NSSetUncaughtExceptionHandler { exception in
-            guard let docs = FileManager.default.urls(for: .documentDirectory,
-                                                       in: .userDomainMask).first else { return }
-            let url = docs.appendingPathComponent(fileName)
-            let stack = exception.callStackSymbols.joined(separator: "\n")
-            let report = """
-            Panorama360 crash report
-            ========================
-            Name:   \(exception.name.rawValue)
-            Reason: \(exception.reason ?? "(none)")
-
-            Call stack:
-            \(stack)
-            """
-            try? report.write(to: url, atomically: true, encoding: .utf8)
-        }
+        // Must be a C function pointer — Swift closures that capture context are rejected.
+        NSSetUncaughtExceptionHandler(panorama360UncaughtExceptionHandler)
     }
 
     /// The persisted crash text from the previous launch, if any.
@@ -47,4 +33,22 @@ public enum CrashReporter {
                                                    in: .userDomainMask).first else { return }
         try? FileManager.default.removeItem(at: docs.appendingPathComponent(fileName))
     }
+}
+
+/// Top-level `@convention(c)`-compatible handler (no captures).
+private func panorama360UncaughtExceptionHandler(_ exception: NSException) {
+    guard let docs = FileManager.default.urls(for: .documentDirectory,
+                                               in: .userDomainMask).first else { return }
+    let url = docs.appendingPathComponent(CrashReporter.fileName)
+    let stack = exception.callStackSymbols.joined(separator: "\n")
+    let report = """
+    Panorama360 crash report
+    ========================
+    Name:   \(exception.name.rawValue)
+    Reason: \(exception.reason ?? "(none)")
+
+    Call stack:
+    \(stack)
+    """
+    try? report.write(to: url, atomically: true, encoding: .utf8)
 }
