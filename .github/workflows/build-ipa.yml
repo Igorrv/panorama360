@@ -1,0 +1,56 @@
+# Builds an unsigned Panorama360 IPA on a cloud Mac (GitHub Actions pays for
+# the macOS runner; you download the IPA and sign+install it on Windows via
+# Sideloadly — see docs/InstallingOnWindows.md).
+#
+# Triggers: every push to main/master, and manually from the Actions tab
+# ("Run workflow"). Public repo = unlimited free minutes.
+name: Build IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install xcodegen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build unsigned .app for device
+        run: |
+          xcodebuild \
+            -project Panorama360.xcodeproj \
+            -scheme Panorama360 \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGN_ENTITLEMENTS="" \
+            CONFIGURATION_BUILD_DIR=build \
+            clean build
+
+      - name: Package unsigned IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/*.app Payload/
+          zip -qr Panorama360-unsigned.ipa Payload
+          ls -lh Panorama360-unsigned.ipa
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Panorama360-unsigned-ipa
+          path: Panorama360-unsigned.ipa
+          retention-days: 30

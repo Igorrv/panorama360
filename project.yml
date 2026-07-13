@@ -1,0 +1,51 @@
+name: Panorama360
+options:
+  bundleIdPrefix: com.teleport
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: ""
+    TARGETED_DEVICE_FAMILY: "1"        # iPhone only
+    HEADER_SEARCH_PATHS:
+      - "$(SRCROOT)/Panorama360"
+    METAL_HEADER_SEARCH_PATHS:
+      - "$(SRCROOT)/Panorama360/Viewer"
+    ENABLE_USER_SCRIPT_SANDBOXING: NO
+    GENERATE_INFOPLIST_FILE: NO
+
+targets:
+  Panorama360:
+    type: application
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: Panorama360
+        excludes:
+          - "Info.plist"
+          - "**/.DS_Store"
+    settings:
+      base:
+        INFOPLIST_FILE: Panorama360/Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: com.teleport.panorama360
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ENABLE_PREVIEWS: YES
+        # Optional OpenCV: add opencv2.xcframework to the target, then OpenCVStitcher.swift
+        # activates automatically via `#if canImport(opencv2)` (see docs/OpenCVIntegration.md).
+    info:
+      path: Panorama360/Info.plist
+      properties:
+        CFBundleDisplayName: Panorama360
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        UILaunchScreen:
+          UIColorName: ""
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSCameraUsageDescription: "Panorama360 uses the camera to capture guided 360 panoramas."
+        NSMotionUsageDescription: "Panorama360 uses motion sensors to detect stability and align captures."
+        NSPhotoLibraryAddUsageDescription: "Panorama360 saves finished panoramas to your photo library."
