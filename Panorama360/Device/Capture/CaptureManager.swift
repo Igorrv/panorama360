@@ -1,5 +1,7 @@
 import Foundation
 import AVFoundation
+import ImageIO
+import CoreGraphics
 
 /// Serialises photo capture + on-disk persistence so the gate can never
 /// double-fire. One capture in flight at a time.
@@ -45,8 +47,7 @@ public actor CaptureManager {
             throw CaptureError.writeFailed
         }
 
-        let width = Int(photo.pixelWidth)
-        let height = Int(photo.pixelHeight)
+        let (width, height) = Self.photoDimensions(photo)
         let intrinsics = camera.intrinsics(forPhotoWidth: width, height: height)
 
         return CaptureSample(
@@ -60,5 +61,19 @@ public actor CaptureManager {
             exifOrientation: 1, // photos are stored upright (portrait) — see CameraEngine
             timestamp: Date().timeIntervalSince1970
         )
+    }
+
+    private static func photoDimensions(_ photo: AVCapturePhoto) -> (Int, Int) {
+        if let cg = photo.cgImageRepresentation()?.takeUnretainedValue() {
+            return (cg.width, cg.height)
+        }
+        if let data = photo.fileDataRepresentation(),
+           let source = CGImageSourceCreateWithData(data as CFData, nil),
+           let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+           let w = props[kCGImagePropertyPixelWidth] as? Int,
+           let h = props[kCGImagePropertyPixelHeight] as? Int {
+            return (w, h)
+        }
+        return (4032, 3024) // fallback typical wide still
     }
 }

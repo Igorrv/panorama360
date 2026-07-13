@@ -57,7 +57,7 @@ public final class CaptureGuide: ObservableObject {
         self.distribution = distribution
         self.thresholds = thresholds
         self.points = SpherePointGenerator.generate(distribution: distribution)
-        self.directions = points.map { Geometry.sphericalToCartesian(pitch: $0.pitch, yaw: $0.yaw) }
+        self.directions = points.map { Geometry.sphericalToCartesianf(pitch: $0.pitch, yaw: $0.yaw) }
     }
 
     public var totalPoints: Int { points.count }
@@ -113,7 +113,7 @@ public final class CaptureGuide: ObservableObject {
     public func reset(with distribution: SphereDistribution? = nil) {
         let d = distribution ?? self.distribution
         points = SpherePointGenerator.generate(distribution: d)
-        directions = points.map { Geometry.sphericalToCartesian(pitch: $0.pitch, yaw: $0.yaw) }
+        directions = points.map { Geometry.sphericalToCartesianf(pitch: $0.pitch, yaw: $0.yaw) }
         overlayPoints = []
         alignment = AlignmentInfo(pointID: nil, angularDistance: .greatestFiniteMagnitude, confidence: 0, state: .idle)
         reticle = .far

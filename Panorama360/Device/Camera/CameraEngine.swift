@@ -122,7 +122,7 @@ public final class CameraEngine: NSObject {
         videoOutput.videoSettings = [
             kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
         ]
-        videoOutput.alwaysDiscardsLateVideoBuffers = true
+        videoOutput.alwaysDiscardsLateVideoFrames = true
         if session.canAddOutput(videoOutput) {
             session.addOutput(videoOutput)
             videoOutput.setSampleBufferDelegate(sampleProxy,
@@ -166,16 +166,13 @@ public final class CameraEngine: NSObject {
 
     private func makePhotoSettings(output: AVCapturePhotoOutput) -> AVCapturePhotoSettings {
         let settings: AVCapturePhotoSettings
-        if output.availablePhotoFileTypes.contains(.heic) {
-            settings = AVCapturePhotoSettings(processedFileType: .heic, processedFormat: nil)
+        if output.availablePhotoCodecTypes.contains(.hevc) {
+            settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
         } else {
             settings = AVCapturePhotoSettings()
         }
         settings.flashMode = .off
         settings.photoQualityPrioritization = .quality
-        if output.isHighDynamicRangeSupported {
-            settings.isHighDynamicRangeEnabled = true
-        }
         return settings
     }
 
@@ -194,7 +191,7 @@ public final class CameraEngine: NSObject {
             return CameraIntrinsics(fx: Float(width), fy: Float(width),
                                     cx: Float(width) / 2, cy: Float(height) / 2)
         }
-        let hfov = format.videoFieldOfView * .pi / 180
+        let hfov = Double(format.videoFieldOfView) * .pi / 180
         let fx = Float((Double(width) / 2) / tan(hfov / 2))
         return CameraIntrinsics(fx: fx, fy: fx,
                                 cx: Float(width) / 2, cy: Float(height) / 2)

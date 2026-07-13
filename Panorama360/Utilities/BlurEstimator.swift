@@ -1,4 +1,5 @@
 import Accelerate
+import CoreVideo
 
 /// Estimates frame sharpness via the variance of the Laplacian on the luma plane.
 ///
@@ -6,7 +7,7 @@ import Accelerate
 /// single-precision for speed so it can run every frame during the capture gate.
 public enum BlurEstimator {
 
-    /// Laplacian 3×3 kernel (ish): emphasises high frequencies.
+    /// Laplacian 3×3 kernel: emphasises high frequencies.
     private static let laplacianKernel: [Float] = [
          0,  1,  0,
          1, -4,  1,
@@ -17,8 +18,9 @@ public enum BlurEstimator {
     /// `capturedImage`). Returns `0` if the buffer is not suitable.
     public static func sharpnessScore(of pixelBuffer: CVPixelBuffer?) -> Float {
         guard let pb = pixelBuffer else { return 0 }
-        guard CVPixelBufferGetPixelFormatType(pb) == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
-                || CVPixelBufferGetPixelFormatType(pb) == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange else {
+        let format = CVPixelBufferGetPixelFormatType(pb)
+        guard format == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
+                || format == kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange else {
             return 0
         }
         guard CVPixelBufferGetPlaneCount(pb) >= 1 else { return 0 }
@@ -39,49 +41,64 @@ public enum BlurEstimator {
         let offX = (planeW - w) / 2
         let offY = (planeH - h) / 2
 
-        var src = vImage_Buffer(data: base,
-                                height: vImagePixelCount(h),
-                                width: vImagePixelCount(w),
-                                rowBytes: rowBytes)
-        // Advance to ROI start.
-        src.data = base.advanced(by: offY * rowBytes + offX)
-
-        return laplacianVariance(src: src, width: w, height: h, rowBytes: rowBytes)
+        var src = vImage_Buffer(
+            data: base.advanced(by: offY * rowBytes + offX),
+            height: vImagePixelCount(h),
+            width: vImagePixelCount(w),
+            rowBytes: rowBytes
+        )
+        return laplacianVariance(src: &src, width: w, height: h)
     }
 
     // MARK: - Internals
 
-    private static func laplacianVariance(src: vImage_Buffer,
-                                          width: Int, height: Int, rowBytes: Int) -> Float {
+    private static func laplacianVariance(src: inout vImage_Buffer,
+                                          width: Int, height: Int) -> Float {
         var floatBuffer = [Float](repeating: 0, count: width * height)
-        var convBuffer  = [Float](repeating: 0, count: width * height)
+        var convBuffer = [Float](repeating: 0, count: width * height)
 
-        var dst = vImage_Buffer(data: &floatBuffer,
-                                height: vImagePixelCount(height),
-                                width: vImagePixelCount(width),
-                                rowBytes: width * MemoryLayout<Float>.size)
+        let floatRowBytes = width * MemoryLayout<Float>.size
+        let count = vDSP_Length(width * height)
 
-        // Planar8 → PlanarF (0..255).
-        var maxFloat: Float = 255
-        var minFloat: Float = 0
-        vImageConvert_Planar8toPlanarF(&src, &dst, maxFloat, minFloat, vImage_Flags(kvImageNoFlags))
+        return floatBuffer.withUnsafeMutableBytes { floatRaw in
+            convBuffer.withUnsafeMutableBytes { convRaw in
+                var dst = vImage_Buffer(
+                    data: floatRaw.baseAddress,
+                    height: vImagePixelCount(height),
+                    width: vImagePixelCount(width),
+                    rowBytes: floatRowBytes
+                )
+                var conv = vImage_Buffer(
+                    data: convRaw.baseAddress,
+                    height: vImagePixelCount(height),
+                    width: vImagePixelCount(width),
+                    rowBytes: floatRowBytes
+                )
 
-        var conv = vImage_Buffer(data: &convBuffer,
-                                 height: vImagePixelCount(height),
-                                 width: vImagePixelCount(width),
-                                 rowBytes: width * MemoryLayout<Float>.size)
+                let maxFloat: Float = 255
+                let minFloat: Float = 0
+                vImageConvert_Planar8toPlanarF(&src, &dst, maxFloat, minFloat, vImage_Flags(kvImageNoFlags))
 
-        let err = vImageConvolve_PlanarF(&dst, &conv, nil, 0, 0,
-                                         UInt32(width), UInt32(height),
-                                         laplacianKernel, 3, 3, 0, nil,
-                                         vImage_Flags(kvImageEdgeExtend))
-        guard err == kvImageNoError else { return 0 }
+                let err = laplacianKernel.withUnsafeBufferPointer { kernelPtr in
+                    vImageConvolve_PlanarF(
+                        &dst, &conv, nil, 0, 0,
+                        kernelPtr.baseAddress!, 3, 3,
+                        0,
+                        vImage_Flags(kvImageEdgeExtend)
+                    )
+                }
+                guard err == kvImageNoError,
+                      let convBase = conv.data?.assumingMemoryBound(to: Float.self) else {
+                    return Float(0)
+                }
 
-        // Variance of the Laplacian response.
-        var mean: Float = 0
-        var stdDev: Float = 0
-        vImageVariance_PlanarF(&conv, &mean, &stdDev, vImage_Flags(kvImageNoFlags))
-        // Variance = stdDev^2 (vImageVariance returns mean & stddev).
-        return stdDev * stdDev
+                var mean: Float = 0
+                var meanSquare: Float = 0
+                vDSP_meanv(convBase, 1, &mean, count)
+                vDSP_measqv(convBase, 1, &meanSquare, count)
+                let variance = meanSquare - mean * mean
+                return max(0, variance)
+            }
+        }
     }
 }

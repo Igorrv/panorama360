@@ -69,7 +69,7 @@ public final class PanoramaRenderer: NSObject, MTKViewDelegate {
         }
         let opts: [MTKTextureLoader.Option: Any] = [
             .origin: MTKTextureLoader.Origin.bottomLeft,
-            .usage: MTLTextureUsage.shaderRead.rawValue
+            .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)
         ]
         do {
             panoTexture = try textureLoader.newTexture(cgImage: cgImage, options: opts)

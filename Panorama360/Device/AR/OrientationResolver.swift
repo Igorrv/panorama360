@@ -32,7 +32,7 @@ public enum OrientationResolver {
         let angle = 2 * acos(min(max(deltaQ.real, -1), 1))
         guard angle > 1e-5 else { return .zero }
         let axis = simd_normalize(SIMD3<Float>(deltaQ.vector.x, deltaQ.vector.y, deltaQ.vector.z))
-        let speed = Float(angle / seconds)
+        let speed = Float(Double(angle) / seconds)
         let v = axis * speed
         return SIMD3<Double>(Double(v.x), Double(v.y), Double(v.z))
     }

@@ -22,7 +22,7 @@ public enum Geometry {
                             -cos(yaw) * cp)
     }
 
-    public static func sphericalToCartesian(pitch: Double, yaw: Double) -> SIMD3<Float> {
+    public static func sphericalToCartesianf(pitch: Double, yaw: Double) -> SIMD3<Float> {
         let v = sphericalToCartesian(pitch: pitch, yaw: yaw)
         return SIMD3<Float>(Float(v.x), Float(v.y), Float(v.z))
     }

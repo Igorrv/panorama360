@@ -49,7 +49,7 @@ extension CameraStatus {
             isAdjustingFocus: device.isAdjustingFocus,
             isAdjustingExposure: device.isAdjustingExposure,
             isAdjustingWhiteBalance: device.isAdjustingWhiteBalance,
-            exposureTargetOffset: device.exposureTargetBiasOffsets.targetOffset,
+            exposureTargetOffset: device.exposureTargetOffset,
             lensAperture: device.lensAperture,
             iso: device.iso,
             exposureDuration: device.exposureDuration.seconds

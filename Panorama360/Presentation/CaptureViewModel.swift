@@ -126,7 +126,7 @@ public final class CaptureViewModel: ObservableObject {
     private func configureFOVIfNeeded() {
         guard !fovConfigured, let device = camera.videoDevice else { return }
         let fov = device.activeFormat.videoFieldOfView * .pi / 180
-        if fov > 0 { guide.horizontalFOV = fov }
+        if fov > 0 { guide.horizontalFOV = Double(fov) }
         fovConfigured = true
     }
 

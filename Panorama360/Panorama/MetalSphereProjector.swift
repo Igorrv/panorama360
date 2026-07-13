@@ -179,7 +179,7 @@ public final class MetalSphereProjector: PanoramaStitcher {
         let origin: MTKTextureLoader.Origin = options.textureOriginTopLeft ? .topLeft : .bottomLeft
         let opts: [MTKTextureLoader.Option: Any] = [
             .origin: origin,
-            .usage: MTLTextureUsage.shaderRead.rawValue
+            .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)
         ]
         for (i, sample) in samples.enumerated() {
             guard let cg = Self.loadCGImage(sample.imageURL) else {

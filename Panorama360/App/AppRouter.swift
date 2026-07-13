@@ -9,6 +9,15 @@ public final class AppRouter: ObservableObject {
         case capture
         case stitching(PanoramaSession)
         case viewer(URL)
+
+        public static func == (lhs: Route, rhs: Route) -> Bool {
+            switch (lhs, rhs) {
+            case (.capture, .capture): return true
+            case (.stitching(let a), .stitching(let b)): return a.id == b.id
+            case (.viewer(let a), .viewer(let b)): return a == b
+            default: return false
+            }
+        }
     }
 
     @Published public private(set) var route: Route = .capture
