@@ -49,16 +49,15 @@ struct CircularProgressView: View {
 
             // Center readout
             VStack(spacing: 4) {
-                if let symbol {
+                if let symbol = centerSymbol {
                     Image(systemName: symbol)
                         .font(.system(size: 22, weight: .semibold))
-                        .foregroundStyle(symbolColor)
+                        .foregroundColor(symbolColor)
                         .symbolRenderingMode(.hierarchical)
                 }
                 Text("\(Int((progress * 100).rounded()))%")
                     .font(.system(size: 32, weight: .bold, design: .monospaced))
-                    .foregroundStyle(.white)
-                    .contentTransition(.numericText())
+                    .foregroundColor(.white)
             }
         }
     }

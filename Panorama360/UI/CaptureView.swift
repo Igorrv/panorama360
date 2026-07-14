@@ -47,7 +47,7 @@ struct CaptureView: View {
                 if let hint = vm.statusHint {
                     Label(hint, systemImage: "scope")
                         .font(.App.caption)
-                        .foregroundStyle(.white)
+                        .foregroundColor(.white)
                         .padding(.horizontal, 16).padding(.vertical, 9)
                         .glassPanel(cornerRadius: Theme.R.pill, tint: Theme.amber)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -143,7 +143,7 @@ struct CaptureView: View {
             Text("GLOBO \(Int((vm.fractionComplete * 100).rounded()))%")
                 .font(.App.micro)
                 .tracking(1)
-                .foregroundStyle(.white.opacity(0.85))
+                .foregroundColor(.white.opacity(0.85))
                 .padding(.horizontal, 8).padding(.vertical, 3)
                 .glassPanel(cornerRadius: Theme.R.pill)
         }
@@ -169,7 +169,7 @@ struct CaptureView: View {
         } label: {
             Image(systemName: "xmark")
                 .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(.white)
+                .foregroundColor(.white)
                 .frame(width: 44, height: 44)
                 .glassPanel(cornerRadius: 22)
         }
@@ -197,7 +197,7 @@ struct CaptureView: View {
         return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(Theme.amber)
+                    .foregroundColor(Theme.amber)
                 Text("O app fechou na última vez")
                     .font(.system(size: 13, weight: .bold))
                 Spacer()
@@ -207,12 +207,12 @@ struct CaptureView: View {
                 if isEmpty {
                     Text("O app foi fechado pelo iOS sem deixar motivo — quase sempre é um encerramento por memória (SIGKILL não pode ser capturado).\n\n• Feche outros apps e tente de novo.\n• O detalhe real está em Ajustes → Privacidade e Segurança → Análises e Melhorias → Dados de Análise → Panorama360 (.ips).")
                         .font(.system(size: 11))
-                        .foregroundStyle(.white.opacity(0.9))
+                        .foregroundColor(.white.opacity(0.9))
                         .frame(maxWidth: .infinity, alignment: .leading)
                 } else {
                     Text(text)
                         .font(.system(size: 10, design: .monospaced))
-                        .foregroundStyle(.white.opacity(0.85))
+                        .foregroundColor(.white.opacity(0.85))
                         .textSelection(.enabled)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -269,7 +269,7 @@ private struct StabilityIndicator: View {
             Text("ESTABILIDADE")
                 .font(.App.micro)
                 .tracking(1.5)
-                .foregroundStyle(.white.opacity(0.7))
+                .foregroundColor(.white.opacity(0.7))
         }
         .padding(12)
         .glassPanel(cornerRadius: Theme.R.md)

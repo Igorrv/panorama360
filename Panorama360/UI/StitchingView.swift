@@ -22,7 +22,7 @@ struct StitchingView: View {
 
                 Text("Montando o panorama 360°")
                     .font(.App.headline)
-                    .foregroundStyle(.white)
+                    .foregroundColor(.white)
                     .glow(Theme.cyan, radius: 10)
 
                 stageList
@@ -77,11 +77,11 @@ struct StitchingView: View {
                 if isDone {
                     Image(systemName: "checkmark")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Theme.mint)
+                        .foregroundColor(Theme.mint)
                 } else {
                     Image(systemName: Self.symbol(for: stage))
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(isCurrent ? Theme.cyan : .white.opacity(0.35))
+                        .foregroundColor(isCurrent ? Theme.cyan : .white.opacity(0.35))
                         .symbolRenderingMode(.hierarchical)
                 }
             }
@@ -89,7 +89,7 @@ struct StitchingView: View {
 
             Text(stage.rawValue)
                 .font(.system(size: 14, weight: isCurrent ? .semibold : .regular, design: .rounded))
-                .foregroundStyle(isDone || isCurrent ? .white : .white.opacity(0.4))
+                .foregroundColor(isDone || isCurrent ? .white : .white.opacity(0.4))
 
             Spacer()
         }

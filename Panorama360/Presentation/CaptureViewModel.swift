@@ -287,7 +287,7 @@ public final class CaptureViewModel: ObservableObject {
 
     private func capture(point: CapturePoint, orientation: DeviceOrientation) async {
         guard !isCapturing else { return }
-        guard let session else { return }
+        guard var session = self.session else { return }
         isCapturing = true
         defer { isCapturing = false }
 
@@ -309,6 +309,7 @@ public final class CaptureViewModel: ObservableObject {
         consecutiveFailures = 0
         guide.markCaptured(pointID: point.id)
         session.record(sample: sample, forPointID: point.id)
+        self.session = session
         try? store.persist(session)
         Haptics.shared.captured()
         Haptics.shared.shutterSound()

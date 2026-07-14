@@ -12,7 +12,7 @@ struct HoloButton: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .foregroundStyle(.white)
+            .foregroundColor(.white)
             .padding(.vertical, 14)
             .padding(.horizontal, 20)
             .frame(maxWidth: fills ? .infinity : nil)

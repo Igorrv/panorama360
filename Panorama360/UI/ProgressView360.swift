@@ -19,25 +19,25 @@ struct ProgressView360: View {
                 if let cov = coverageFraction {
                     Text("Cobertura ")
                         .font(.App.caption)
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundColor(.white.opacity(0.6))
                     + Text("\(Int((cov * 100).rounded()))%")
                         .font(.App.hudLarge)
-                        .foregroundStyle(Theme.success)
+                        .foregroundColor(Theme.mint)
                     Spacer()
                     Label("\(captured) fotos", systemImage: "camera")
                         .font(.App.hud)
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundColor(.white.opacity(0.7))
                 } else {
                     Text("\(captured)")
                         .font(.App.hudLarge)
-                        .foregroundStyle(Theme.success)
+                        .foregroundColor(Theme.mint)
                     Text("de \(total)")
                         .font(.App.caption)
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundColor(.white.opacity(0.6))
                     Spacer()
                     Label(etaLabel, systemImage: "clock")
                         .font(.App.hud)
-                        .foregroundStyle(.white.opacity(0.7))
+                        .foregroundColor(.white.opacity(0.7))
                 }
             }
 

@@ -128,7 +128,7 @@ public actor LiveReconstructionManager {
                 }
                 let photo = try textureLoader.newTexture(
                     cgImage: cg,
-                    options: [.origin: .topLeft,
+                    options: [.origin: MTKTextureLoader.Origin.topLeft,
                               .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)])
 
                 guard let buffer = commandQueue.makeCommandBuffer() else { return }

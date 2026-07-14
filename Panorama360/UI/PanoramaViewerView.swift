@@ -112,7 +112,7 @@ struct PanoramaViewerView: View {
                             .frame(width: 44, height: 44)
                     }
                 }
-                .foregroundStyle(.white)
+                .foregroundColor(.white)
                 .glassPanel(cornerRadius: 22, tint: router.tutorialActive ? Theme.mint : nil)
             }
 
@@ -121,7 +121,7 @@ struct PanoramaViewerView: View {
             Text("360°")
                 .font(.App.micro)
                 .tracking(2)
-                .foregroundStyle(Theme.cyan)
+                .foregroundColor(Theme.cyan)
                 .padding(.horizontal, 10).padding(.vertical, 6)
                 .glassPanel(cornerRadius: Theme.R.pill)
 
@@ -132,7 +132,7 @@ struct PanoramaViewerView: View {
             } label: {
                 Image(systemName: "gyroscope")
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(gyroOn ? Theme.mint : .white)
+                    .foregroundColor(gyroOn ? Theme.mint : .white)
                     .frame(width: 44, height: 44)
                     .glassPanel(cornerRadius: 22, tint: gyroOn ? Theme.mint : nil)
             }
@@ -148,7 +148,7 @@ struct PanoramaViewerView: View {
                 Label("Pinça para zoom", systemImage: "plus.magnifyingglass")
             }
             .font(.App.caption)
-            .foregroundStyle(.white.opacity(0.6))
+            .foregroundColor(.white.opacity(0.6))
 
             Spacer()
             FOVPill(engine: vm.engine)
@@ -181,7 +181,7 @@ private struct HeadingCompass: View {
                 .rotationEffect(.degrees(-Double(engine.yaw) * 180 / .pi))
             Text("\(Int(d.rounded()))°")
                 .font(.App.micro)
-                .foregroundStyle(.white.opacity(0.85))
+                .foregroundColor(.white.opacity(0.85))
                 .offset(y: 15)
         }
         .shadow(color: .black.opacity(0.4), radius: 8)
@@ -197,7 +197,7 @@ private struct FOVPill: View {
         let zoom = 1.2 / Double(engine.fov)
         return Label(String(format: "%.1fx", zoom), systemImage: "plus.magnifyingglass")
             .font(.App.hud)
-            .foregroundStyle(.white.opacity(0.85))
+            .foregroundColor(.white.opacity(0.85))
             .padding(.horizontal, 14).padding(.vertical, 8)
             .glassPanel(cornerRadius: Theme.R.pill, tint: Theme.violet)
     }

@@ -67,11 +67,11 @@ struct OnboardingView: View {
             VStack(spacing: 14) {
                 Text(card.title)
                     .font(.App.title)
-                    .foregroundStyle(.white)
+                    .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                 Text(card.body)
                     .font(.App.body)
-                    .foregroundStyle(.white.opacity(0.82))
+                    .foregroundColor(.white.opacity(0.82))
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)
             }
@@ -95,8 +95,7 @@ struct OnboardingView: View {
                 .frame(width: 152, height: 152)
             Image(systemName: card.icon)
                 .font(.system(size: 58, weight: .regular))
-                .foregroundStyle(LinearGradient(colors: [card.accent, Theme.cyan],
-                                                startPoint: .top, endPoint: .bottom))
+                .foregroundColor(card.accent)
                 .shadow(color: card.accent.opacity(0.6), radius: 18)
         }
     }
@@ -134,7 +133,7 @@ struct OnboardingView: View {
                 } label: {
                     Text("Pular — usar captura completa")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.6))
+                        .foregroundColor(.white.opacity(0.6))
                         .padding(.vertical, 6)
                 }
             } else {
@@ -151,7 +150,7 @@ struct OnboardingView: View {
                 } label: {
                     Text("Pular")
                         .font(.system(size: 14, weight: .medium))
-                        .foregroundStyle(.white.opacity(0.5))
+                        .foregroundColor(.white.opacity(0.5))
                         .padding(.vertical, 6)
                 }
             }

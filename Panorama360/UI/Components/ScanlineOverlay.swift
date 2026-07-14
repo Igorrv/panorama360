@@ -60,7 +60,7 @@ private struct CornerBrackets: Shape {
         // Bottom-left
         p.move(to: CGPoint(x: x0 + inset, y: y1 - inset - len))
         p.addLine(to: CGPoint(x: x0 + inset, y: y1 - inset))
-        p.addLine(to: CGPoint(x: x0 + inset + len, y1 - inset))
+        p.addLine(to: CGPoint(x: x0 + inset + len, y: y1 - inset))
         // Bottom-right
         p.move(to: CGPoint(x: x1 - inset - len, y: y1 - inset))
         p.addLine(to: CGPoint(x: x1 - inset,    y: y1 - inset))
