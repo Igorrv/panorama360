@@ -30,7 +30,11 @@ public final class MotionEngine {
 
     public var isRunning: Bool { manager.isDeviceMotionActive }
 
-    public func start(interval: TimeInterval = 1.0 / 60.0) throws {
+    /// Default 30 Hz (was 60). Each update hops to the main actor for guide UI,
+    /// so halving the rate halves that load — important on the capture screen
+    /// where the main actor also runs the gate + Canvas redraws. 30 Hz is plenty
+    /// for alignment and stability.
+    public func start(interval: TimeInterval = 1.0 / 30.0) throws {
         guard manager.isDeviceMotionAvailable else { throw MotionError.unavailable }
         manager.deviceMotionUpdateInterval = interval
         manager.startDeviceMotionUpdates(using: .xArbitraryZVertical, to: queue) { [weak self] data, _ in

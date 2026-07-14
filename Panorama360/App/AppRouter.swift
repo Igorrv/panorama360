@@ -53,9 +53,14 @@ public final class AppRouter: ObservableObject {
         goCapture()
     }
 
-    /// Skip onboarding straight to full capture.
+    /// Skip onboarding straight to full capture — but **without** persisting
+    /// "onboarding done". Onboarding is only marked done when the user actually
+    /// reaches the viewer (a successful capture). This is the crash-loop guard:
+    /// if full capture crashes, the next launch returns to onboarding instead of
+    /// relaunching into the crashing screen forever.
     public func skipOnboarding() {
-        completeOnboarding()
+        tutorialActive = false
+        defaults.set(false, forKey: tutorialKey)
         goCapture()
     }
 

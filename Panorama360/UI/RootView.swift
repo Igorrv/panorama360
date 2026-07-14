@@ -1,6 +1,9 @@
 import SwiftUI
 
-/// Switches between capture → stitching → viewer based on `AppRouter`.
+/// Switches between onboarding → capture → stitching → viewer based on
+/// `AppRouter`. Each route carries a directional transition so navigation feels
+/// cinematic: stitching "rises" from the bottom, the viewer "resolves" with a
+/// scale-in, the camera/onboarding hand off with a clean fade.
 struct RootView: View {
 
     @EnvironmentObject private var router: AppRouter
@@ -11,28 +14,34 @@ struct RootView: View {
             switch router.route {
             case .onboarding:
                 OnboardingView()
-                    .transition(.opacity)
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.96)),
+                        removal: .opacity))
             case .capture:
-                CaptureView(distribution: router.tutorialActive ? .tutorial : .default)
+                CaptureView(mode: router.tutorialActive ? .fixed(.tutorial) : .dynamic)
                     .id(router.captureGeneration)
                     .transition(.opacity)
             case .stitching(let session):
                 StitchingView(session: session)
-                    .transition(.opacity)
+                    .transition(.asymmetric(
+                        insertion: .move(edge: .bottom).combined(with: .opacity),
+                        removal: .opacity))
             case .viewer(let url):
                 PanoramaViewerView(url: url)
-                    .transition(.opacity)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.9).combined(with: .opacity),
+                        removal: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.35), value: routeTag(router.route))
+        .animation(.spring(response: 0.5, dampingFraction: 0.86), value: routeTag(router.route))
     }
 
     private func routeTag(_ route: AppRouter.Route) -> String {
         switch route {
         case .onboarding: return "onboarding"
-        case .capture: return "capture"
-        case .stitching: return "stitching"
-        case .viewer: return "viewer"
+        case .capture:    return "capture"
+        case .stitching:  return "stitching"
+        case .viewer:     return "viewer"
         }
     }
 }

@@ -44,7 +44,7 @@ targets:
         CFBundleShortVersionString: "1.0"
         CFBundleVersion: "1"
         UILaunchScreen:
-          UIColorName: ""
+          UIColorName: "LaunchColor"
         UISupportedInterfaceOrientations:
           - UIInterfaceOrientationPortrait
         NSCameraUsageDescription: "Panorama360 uses the camera to capture guided 360 panoramas."

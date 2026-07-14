@@ -75,22 +75,20 @@ public final class MetalSphereProjector: PanoramaStitcher {
 
         guard !samples.isEmpty else { throw StitchError.noSamples }
 
-        // Stage: load + (optional) lens correction.
+        // Stage: loading.
         onProgress(0.02, .loading)
-        let processed: [(MTLTexture, CaptureSample)] = try loadTextures(samples) { fraction in
-            onProgress(0.02 + 0.18 * fraction, .undistorting)
-        }
 
-        // Stage: exposure matching.
-        onProgress(0.22, .exposure)
+        // Stage: exposure matching (lightweight — uses lazy CIImages).
+        onProgress(0.08, .exposure)
         let gains = ExposureCompensator.gains(for: samples,
                                               loader: { Self.loadCIImage($0) },
                                               context: ciContext)
 
-        // Stage: project + blend on the GPU.
-        onProgress(0.30, .projecting)
-        let finalTexture = try render(processed: processed, gains: gains) { fraction in
-            onProgress(0.30 + 0.55 * fraction, .projecting)
+        // Stage: project + blend on the GPU. Textures are streamed one at a time
+        // (see `render`) so peak memory stays bounded.
+        onProgress(0.15, .projecting)
+        let finalTexture = try render(samples: samples, gains: gains) { fraction in
+            onProgress(0.15 + 0.70 * fraction, .projecting)
         }
 
         // Stage: finalize + write.
@@ -107,7 +105,12 @@ public final class MetalSphereProjector: PanoramaStitcher {
 
     // MARK: - Rendering
 
-    private func render(processed: [(MTLTexture, CaptureSample)],
+    /// Streams photos one texture at a time. Loading every photo as a full-res
+    /// MTLTexture up front would peak at N × ~49 MB (≈ 900 MB for 18 shots) and
+    /// get the app jetsam-killed. Instead each photo is loaded inside an
+    /// autoreleasepool, accumulated into the canvas, then freed before the next.
+    /// Peak VRAM ≈ 1 photo + 2 accumulators.
+    private func render(samples: [CaptureSample],
                         gains: [Float],
                         onProgress: @escaping @Sendable (Double) -> Void) throws -> MTLTexture {
 
@@ -117,18 +120,42 @@ public final class MetalSphereProjector: PanoramaStitcher {
         let final = try makeTexture(width: width, height: height,
                                     usage: [.shaderWrite, .shaderRead, .renderTarget, .pixelFormatView])
 
-        guard let buffer = commandQueue.makeCommandBuffer() else { throw StitchError.renderFailed }
+        let origin: MTKTextureLoader.Origin = options.textureOriginTopLeft ? .topLeft : .bottomLeft
+        let loaderOpts: [MTKTextureLoader.Option: Any] = [
+            .origin: origin,
+            .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)
+        ]
 
-        for (i, entry) in processed.enumerated() {
-            let (photo, sample) = entry
-            let gain = i < gains.count ? gains[i] : 1.0
-            let isFirst = (i == 0)
-            accumulate(into: accumulator, photo: photo, sample: sample, gain: gain,
-                       loadAction: isFirst ? .clear : .load, buffer: buffer)
-            onProgress(Double(i + 1) / Double(processed.count))
+        var cleared = false
+        let total = max(samples.count, 1)
+        var processed = 0
+
+        for (i, sample) in samples.enumerated() {
+            try autoreleasepool {
+                guard let cg = Self.loadCGImage(sample.imageURL) else {
+                    Log.stitch.warning("Skipping unreadable image \(sample.imageURL.lastPathComponent, privacy: .public)")
+                    return
+                }
+                let photo = try textureLoader.newTexture(cgImage: cg, options: loaderOpts)
+
+                guard let buffer = commandQueue.makeCommandBuffer() else { throw StitchError.renderFailed }
+                let gain = i < gains.count ? gains[i] : 1.0
+                // Clear the accumulator on the first *successfully accumulated* pass.
+                let loadAction: MTLLoadAction = cleared ? .load : .clear
+                accumulate(into: accumulator, photo: photo, sample: sample,
+                           gain: gain, loadAction: loadAction, buffer: buffer)
+                cleared = true
+                processed += 1
+                buffer.commit()
+                buffer.waitUntilCompleted()   // ensures `photo` can be freed now
+                onProgress(Double(processed) / Double(total))
+            }
         }
-        divide(accumulator: accumulator, into: final, buffer: buffer)
 
+        guard cleared else { throw StitchError.noSamples }
+
+        guard let buffer = commandQueue.makeCommandBuffer() else { throw StitchError.renderFailed }
+        divide(accumulator: accumulator, into: final, buffer: buffer)
         buffer.commit()
         buffer.waitUntilCompleted()
         return final
@@ -168,30 +195,6 @@ public final class MetalSphereProjector: PanoramaStitcher {
         encoder.setFragmentSamplerState(sampler, index: 0)
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
         encoder.endEncoding()
-    }
-
-    // MARK: - Texture loading
-
-    private func loadTextures(_ samples: [CaptureSample],
-                              onProgress: @escaping @Sendable (Double) -> Void) throws -> [(MTLTexture, CaptureSample)] {
-        var result: [(MTLTexture, CaptureSample)] = []
-        result.reserveCapacity(samples.count)
-        let origin: MTKTextureLoader.Origin = options.textureOriginTopLeft ? .topLeft : .bottomLeft
-        let opts: [MTKTextureLoader.Option: Any] = [
-            .origin: origin,
-            .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)
-        ]
-        for (i, sample) in samples.enumerated() {
-            guard let cg = Self.loadCGImage(sample.imageURL) else {
-                Log.stitch.warning("Skipping unreadable image \(sample.imageURL.lastPathComponent, privacy: .public)")
-                continue
-            }
-            let texture = try textureLoader.newTexture(cgImage: cg, options: opts)
-            result.append((texture, sample))
-            onProgress(Double(i + 1) / Double(samples.count))
-        }
-        guard !result.isEmpty else { throw StitchError.noSamples }
-        return result
     }
 
     // MARK: - Helpers
@@ -264,9 +267,9 @@ public enum StitchError: LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case .metalUnavailable: return "Metal is not available on this device."
-        case .noSamples: return "No photos were captured to stitch."
-        case .renderFailed: return "Stitching failed during GPU rendering."
+        case .metalUnavailable: return "O Metal não está disponível neste dispositivo."
+        case .noSamples: return "Nenhuma foto foi capturada para montar."
+        case .renderFailed: return "A montagem falhou durante o processamento na GPU."
         }
     }
 }

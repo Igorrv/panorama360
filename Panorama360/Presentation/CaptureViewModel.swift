@@ -2,9 +2,17 @@ import Foundation
 import SwiftUI
 import Combine
 import os
+import simd
 
 /// Drives the capture screen: wires the camera, motion and guide, runs the
-/// auto-capture gate, persists photos, and reports progress to SwiftUI.
+/// auto-capture gate, persists photos, feeds each capture to the live 360°
+/// reconstruction, and reports progress to SwiftUI.
+///
+/// Two modes (see `GuideMode`):
+/// - `.fixed` — the tutorial ring; completes when every point is captured.
+/// - `.dynamic` — the spatial scanner: one active target at a time, replaced
+///   after each capture by the next uncovered direction (coverage-driven), and
+///   each photo is added live to the globe. Completes when coverage is reached.
 @MainActor
 public final class CaptureViewModel: ObservableObject {
 
@@ -19,6 +27,20 @@ public final class CaptureViewModel: ObservableObject {
     @Published public private(set) var isReady: Bool = false
     @Published public private(set) var isCapturing: Bool = false
     @Published public private(set) var errorMessage: String?
+    /// Human-readable reason capture isn't firing right now (pt-BR). Shown under
+    /// the reticle so a stall is self-diagnosing instead of silent.
+    @Published public private(set) var statusHint: String?
+    /// 0..1 capture confidence for the reticle ring (alignment + stability + sharpness).
+    @Published public private(set) var captureConfidence: Float = 0
+    /// Sphere coverage so far (dynamic mode); drives the progress bar.
+    @Published public private(set) var coverageFraction: Double = 0
+    @Published public private(set) var coverageComplete: Bool = false
+    /// True when the live globe Metal objects were built (false ⇒ degraded,
+    /// capture still works without the PiP).
+    @Published public private(set) var liveGlobeAvailable: Bool = false
+
+    /// Whether the bottom bar should show coverage % instead of "X de Y".
+    public var usesCoverage: Bool { guide.mode == .dynamic }
 
     // MARK: - Dependencies
 
@@ -37,10 +59,15 @@ public final class CaptureViewModel: ObservableObject {
     private let cooldown: Double = 0.6
     private var evaluateTask: Task<Void, Never>?
     private var fovConfigured = false
+    private var consecutiveFailures = 0
 
-    /// Lock-protected sharpness written from the camera's video queue and read
-    /// by the ~15 Hz gate on the main actor. `OSAllocatedUnfairLock` is Sendable,
-    /// so the callback captures the lock itself (not `self`) — no main-actor hop.
+    /// Coverage target generator (dynamic mode only), built once the lens FOV is known.
+    private var coverage: CoverageAnalyzer?
+
+    /// Live globe (PiP). Set by `attachLiveGlobe` from the `LiveMeshPreview`.
+    private var liveRenderer: SpatialFragmentRenderer?
+    private var reconstruction: LiveReconstructionManager?
+
     private let sharpnessLock = OSAllocatedUnfairLock(initialState: Float(0))
     private var latestOrientation: DeviceOrientation?
     private var latestStability = Stability(score: 0, angularSpeed: 0, isStable: false)
@@ -51,15 +78,22 @@ public final class CaptureViewModel: ObservableObject {
 
     // MARK: - Init
 
-    public init(distribution: SphereDistribution = .default, store: SessionStore = SessionStore()) {
-        self.guide = CaptureGuide(distribution: distribution)
+    public init(mode: GuideMode = .fixed(.default), store: SessionStore = SessionStore()) {
+        self.guide = CaptureGuide(mode: mode)
         self.store = store
         self.captureManager = CaptureManager(camera: camera, store: store)
         let lock = sharpnessLock
         camera.onSharpness = { score in lock.withLock { $0 = score } }
         camera.onRuntimeError = { [weak self] detail in
-            Task { @MainActor in self?.errorMessage = "Camera error: \(detail)" }
+            Task { @MainActor in self?.errorMessage = "Erro de câmera: \(detail)" }
         }
+    }
+
+    /// Hands the live-globe Metal objects to the VM (called from LiveMeshPreview.onReady).
+    public func attachLiveGlobe(renderer: SpatialFragmentRenderer, manager: LiveReconstructionManager) {
+        liveRenderer = renderer
+        reconstruction = manager
+        liveGlobeAvailable = true
     }
 
     // MARK: - Lifecycle
@@ -67,7 +101,7 @@ public final class CaptureViewModel: ObservableObject {
     public func start() async {
         totalPoints = guide.totalPoints
         let authorized = await camera.requestAuthorization()
-        guard authorized else { errorMessage = "Camera permission is required."; return }
+        guard authorized else { errorMessage = "É preciso permitir o acesso à câmera."; return }
 
         let id = UUID()
         do {
@@ -76,14 +110,14 @@ public final class CaptureViewModel: ObservableObject {
                                       points: guide.points,
                                       directoryURL: dir)
         } catch {
-            errorMessage = "Could not create a session directory."
+            errorMessage = "Não foi possível criar a pasta da sessão."
             return
         }
 
         do {
             try await camera.start()
         } catch {
-            errorMessage = "Camera could not start: \(error.localizedDescription)"
+            errorMessage = "Não foi possível iniciar a câmera: \(error.localizedDescription)"
             return
         }
         Haptics.shared.prepare()
@@ -95,7 +129,7 @@ public final class CaptureViewModel: ObservableObject {
         do {
             try motion.start()
         } catch {
-            errorMessage = "Motion sensors unavailable."
+            errorMessage = "Sensores de movimento indisponíveis."
             return
         }
 
@@ -113,9 +147,9 @@ public final class CaptureViewModel: ObservableObject {
         onCancel?()
     }
 
-    /// Suspends camera + motion when the app is backgrounded. iOS kills apps
-    /// that keep the camera running while suspended — this is a prime cause of
-    /// "the app just closes". Safe to call repeatedly / before start.
+    /// Suspends camera + motion when backgrounded. iOS kills apps that keep the
+    /// camera running while suspended. The live globe is NOT torn down — its
+    /// textures persist and resume on foreground.
     public func suspend() {
         evaluateTask?.cancel()
         evaluateTask = nil
@@ -131,23 +165,22 @@ public final class CaptureViewModel: ObservableObject {
         do {
             try motion.start()
         } catch {
-            errorMessage = "Motion sensors unavailable."
+            errorMessage = "Sensores de movimento indisponíveis."
             return
         }
         Task { try? await camera.start() }
         startEvaluating()
     }
 
-    /// Manual escape hatch: stop capturing and proceed to stitching with
-    /// whatever photos were taken (≥1). Guarantees the user can always reach
-    /// the viewer even if the auto-gate is slow to fire.
+    /// Manual escape hatch: stop capturing and proceed to stitching with the
+    /// photos taken so far (≥1).
     public func finishCapture() {
         guard let session else {
-            errorMessage = "Session not started yet."
+            errorMessage = "Sessão ainda não iniciada."
             return
         }
         guard guide.capturedCount >= 1 else {
-            errorMessage = "Capture at least one point before finishing (aim at a glowing dot and hold still)."
+            errorMessage = "Capture pelo menos um ponto antes de finalizar (mire em um ponto brilhante e fique parado)."
             return
         }
         evaluateTask?.cancel()
@@ -158,10 +191,8 @@ public final class CaptureViewModel: ObservableObject {
         onComplete?(session)
     }
 
-    /// True when there is at least one photo to stitch (enables the Finish button).
     public var canFinish: Bool { guide.capturedCount >= 1 }
 
-    /// Clears the current error banner.
     public func dismissError() { errorMessage = nil }
 
     // MARK: - Per-frame handling
@@ -176,6 +207,8 @@ public final class CaptureViewModel: ObservableObject {
         stabilityScore = latestStability.score
         guide.update(orientation: orientation)
         reticle = guide.reticle
+        // The live globe tracks the device.
+        liveRenderer?.updateOrientation(orientation)
         configureFOVIfNeeded()
     }
 
@@ -184,6 +217,10 @@ public final class CaptureViewModel: ObservableObject {
         let fov = device.activeFormat.videoFieldOfView * .pi / 180
         if fov > 0 { guide.horizontalFOV = Double(fov) }
         fovConfigured = true
+        // Build the coverage analyzer now that the lens FOV is known.
+        if guide.mode == .dynamic, coverage == nil {
+            coverage = CoverageAnalyzer(halfFOV: Double(fov) / 2)
+        }
     }
 
     private var latestSharpness: Float { sharpnessLock.withLock { $0 } }
@@ -215,45 +252,108 @@ public final class CaptureViewModel: ObservableObject {
             hasTarget: guide.alignment.pointID != nil
         )
 
-        guard gate.evaluate(input).ready,
+        let output = gate.evaluate(input)
+        statusHint = hint(for: output.blockers, ready: output.ready)
+        captureConfidence = CaptureConfidenceEngine.combine(
+            alignment: guide.alignment.confidence,
+            stability: latestStability.score,
+            sharpness: latestSharpness,
+            minSharpness: gate.minSharpness)
+
+        guard output.ready,
               let pid = guide.alignment.pointID,
               let point = guide.points.first(where: { $0.id == pid }) else { return }
 
         await capture(point: point, orientation: orientation)
     }
 
-    // MARK: - Capture
+    /// Turns the gate's blockers into a one-line Portuguese instruction.
+    private func hint(for blockers: [CaptureGateOutput.Blocker], ready: Bool) -> String? {
+        if ready { return nil }
+        if coverageComplete { return "Cobertura completa — toque em Finalizar" }
+        guard let first = blockers.first else { return nil }
+        switch first {
+        case .noTarget:           return "Mire em um ponto brilhante"
+        case .notAligned:         return "Centralize o ponto"
+        case .moving:             return "Fique parado"
+        case .adjustingFocus:     return "Fique parado — focando"
+        case .adjustingExposure:  return "Fique parado — exposição"
+        case .blurry:             return "Muito escuro/tremido — mais luz"
+        case .cooldown:           return nil   // transient; don't show
+        }
+    }
+
+    // MARK: - Capture + live reconstruction
 
     private func capture(point: CapturePoint, orientation: DeviceOrientation) async {
         guard !isCapturing else { return }
+        guard let session else { return }
         isCapturing = true
         defer { isCapturing = false }
 
+        let sample: CaptureSample
         do {
-            let sample = try await captureManager.capture(
-                point: point, orientation: orientation, sessionID: session!.id)
-
-            guide.markCaptured(pointID: point.id)
-            session?.record(sample: sample, forPointID: point.id)
-            try? store.persist(session!)
-
-            Haptics.shared.captured()
-
-            let now = Date().timeIntervalSince1970
-            if captureIntervals.isEmpty {
-                captureIntervals.append(now - sessionStartTime)
-            } else {
-                captureIntervals.append(now - lastCaptureTime)
-            }
-            lastCaptureTime = now
-            updateProgress()
-
-            if session?.isCaptureComplete == true {
-                evaluateTask?.cancel()
-                onComplete?(session!)
-            }
+            sample = try await captureManager.capture(
+                point: point, orientation: orientation, sessionID: session.id)
         } catch {
+            consecutiveFailures += 1
             Log.capture.error("Capture failed: \(error.localizedDescription, privacy: .public)")
+            if consecutiveFailures >= 3 {
+                errorMessage = "A captura está falhando repetidamente (\(error.localizedDescription)). " +
+                               "Toque em “Finalizar e montar 360°” para usar as fotos já tiradas."
+            }
+            return
+        }
+
+        // Success — feedback sequence: haptic + shutter sound + green check + globe update.
+        consecutiveFailures = 0
+        guide.markCaptured(pointID: point.id)
+        session.record(sample: sample, forPointID: point.id)
+        try? store.persist(session)
+        Haptics.shared.captured()
+        Haptics.shared.shutterSound()
+
+        // Add the photo to the live globe (suspends main actor; UI keeps running).
+        await reconstruction?.add(sample)
+
+        // Dynamic mode: update coverage and advance to the next target.
+        if guide.mode == .dynamic {
+            advanceDynamicCoverage(captured: point)
+        }
+
+        let now = Date().timeIntervalSince1970
+        captureIntervals.append(captureIntervals.isEmpty ? now - sessionStartTime : now - lastCaptureTime)
+        lastCaptureTime = now
+        updateProgress()
+
+        // Completion: fixed ring when all captured; dynamic when coverage reached.
+        let complete: Bool
+        switch guide.mode {
+        case .fixed:
+            complete = session.isCaptureComplete
+        case .dynamic:
+            complete = coverageComplete
+        }
+        if complete {
+            evaluateTask?.cancel()
+            onComplete?(session)
+        }
+    }
+
+    /// Records the capture in the coverage analyzer and replaces the active
+    /// target with the next uncovered direction (or marks coverage complete).
+    private func advanceDynamicCoverage(captured point: CapturePoint) {
+        guard var cov = coverage else { return }
+        cov.mark(pitch: point.pitch, yaw: point.yaw)
+        coverageFraction = cov.coverageFraction
+        coverage = cov
+
+        let look = latestOrientation?.lookDirection ?? SIMD3<Float>(0, 0, -1)
+        let lookD = SIMD3<Double>(Double(look.x), Double(look.y), Double(look.z))
+        if let next = cov.nextTarget(currentLook: lookD) {
+            guide.setActiveTarget(pitch: next.pitch, yaw: next.yaw)
+        } else {
+            coverageComplete = true
         }
     }
 
@@ -261,8 +361,12 @@ public final class CaptureViewModel: ObservableObject {
 
     private func updateProgress() {
         capturedCount = guide.capturedCount
-        fractionComplete = guide.fractionComplete
-        let remaining = Double(totalPoints - capturedCount)
+        if guide.mode == .dynamic {
+            fractionComplete = coverageFraction
+        } else {
+            fractionComplete = guide.fractionComplete
+        }
+        let remaining = max(0, Double(totalPoints - capturedCount))
         let avgInterval = captureIntervals.reduce(0, +) / Double(max(captureIntervals.count, 1))
         etaSeconds = remaining * avgInterval
     }

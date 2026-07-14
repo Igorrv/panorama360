@@ -18,6 +18,7 @@ struct Panorama360App: App {
                 .environmentObject(router)
                 .preferredColorScheme(.dark)
                 .statusBarHidden()
+                .tint(Theme.cyan)
         }
     }
 }

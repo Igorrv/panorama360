@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// Bottom progress card: segmented bar, count, and ETA.
+/// Bottom progress card. In fixed mode shows "X de Y" + ETA; in coverage
+/// (dynamic) mode shows "Cobertura NN%" + the photo count. Holographic styling:
+/// glass panel, monospaced readouts and a shimmering gradient bar.
 struct ProgressView360: View {
 
     let fraction: Double
@@ -8,42 +10,52 @@ struct ProgressView360: View {
     let total: Int
     let eta: Double
     let stability: Double
+    /// Non-nil in dynamic mode — switches the card to coverage display.
+    var coverageFraction: Double? = nil
 
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             HStack(alignment: .firstTextBaseline) {
-                Text("\(captured)")
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundStyle(.white)
-                Text("de \(total)")
-                    .font(.system(size: 14, weight: .medium, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.6))
-                Spacer()
-                Label(etaLabel, systemImage: "clock")
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundStyle(.white.opacity(0.7))
+                if let cov = coverageFraction {
+                    Text("Cobertura ")
+                        .font(.App.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                    + Text("\(Int((cov * 100).rounded()))%")
+                        .font(.App.hudLarge)
+                        .foregroundStyle(Theme.success)
+                    Spacer()
+                    Label("\(captured) fotos", systemImage: "camera")
+                        .font(.App.hud)
+                        .foregroundStyle(.white.opacity(0.7))
+                } else {
+                    Text("\(captured)")
+                        .font(.App.hudLarge)
+                        .foregroundStyle(Theme.success)
+                    Text("de \(total)")
+                        .font(.App.caption)
+                        .foregroundStyle(.white.opacity(0.6))
+                    Spacer()
+                    Label(etaLabel, systemImage: "clock")
+                        .font(.App.hud)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
             }
 
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(Color.white.opacity(0.14))
+                        .fill(Color.white.opacity(0.12))
                     Capsule()
-                        .fill(LinearGradient(
-                            colors: [Color(red: 0.2, green: 0.9, blue: 0.6),
-                                     Color(red: 0.25, green: 0.6, blue: 1.0)],
-                            startPoint: .leading, endPoint: .trailing))
+                        .fill(Theme.progress)
                         .frame(width: geo.size.width * CGFloat(max(0, min(1, fraction))))
+                        .shimmer(active: fraction > 0.001 && fraction < 0.999, tint: .white)
                         .animation(.spring(response: 0.45, dampingFraction: 0.85), value: fraction)
                 }
             }
-            .frame(height: 8)
+            .frame(height: 9)
         }
         .padding(18)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous)
-                    .stroke(Color.white.opacity(0.12), lineWidth: 1))
-        .shadow(color: .black.opacity(0.35), radius: 12, y: 4)
+        .glassPanel(cornerRadius: Theme.R.lg, tint: Theme.cyan)
     }
 
     private var etaLabel: String {

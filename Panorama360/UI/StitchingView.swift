@@ -1,6 +1,8 @@
 import SwiftUI
 
-/// Runs the panorama stitcher and shows a stage-by-stage pipeline.
+/// Runs the panorama stitcher and shows a stage-by-stage pipeline over the
+/// holographic background. Each stage row carries its own SF Symbol; the active
+/// stage glows cyan, completed stages show a mint check.
 struct StitchingView: View {
 
     let session: PanoramaSession
@@ -11,16 +13,17 @@ struct StitchingView: View {
 
     var body: some View {
         ZStack {
-            backgroundGradient
-            VStack(spacing: 36) {
+            HoloBackground()
+            VStack(spacing: 32) {
                 Spacer()
 
-                CircularProgressView(progress: vm.progress)
-                    .frame(width: 180, height: 180)
+                CircularProgressView(progress: vm.progress, centerSymbol: Self.symbol(for: vm.stage))
+                    .frame(width: 184, height: 184)
 
-                Text("Stitching Panorama")
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                Text("Montando o panorama 360°")
+                    .font(.App.headline)
                     .foregroundStyle(.white)
+                    .glow(Theme.cyan, radius: 10)
 
                 stageList
                     .padding(.horizontal, 32)
@@ -35,12 +38,12 @@ struct StitchingView: View {
             vm.onComplete = { router.goViewer($0) }
             vm.run(session: session)
         }
-        .alert("Stitching failed",
+        .alert("Falha ao montar",
                isPresented: Binding(
                 get: { vm.errorMessage != nil },
                 set: { shown in if !shown { vm.dismissError() } }
                )) {
-            Button("Back to capture", role: .cancel) {
+            Button("Voltar à captura", role: .cancel) {
                 vm.dismissError()
                 router.goCapture()
             }
@@ -49,15 +52,7 @@ struct StitchingView: View {
         }
     }
 
-    // MARK: - Subviews
-
-    private var backgroundGradient: some View {
-        LinearGradient(
-            colors: [Color(red: 0.04, green: 0.05, blue: 0.10),
-                     Color.black],
-            startPoint: .top, endPoint: .bottom)
-            .ignoresSafeArea()
-    }
+    // MARK: - Stage list
 
     private var stageList: some View {
         VStack(spacing: 10) {
@@ -67,7 +62,7 @@ struct StitchingView: View {
         }
         .padding(18)
         .frame(maxWidth: 360)
-        .glassPanel(cornerRadius: 20)
+        .glassPanel(cornerRadius: Theme.R.lg, tint: Theme.cyan)
     }
 
     private func stageRow(_ stage: StitchStage) -> some View {
@@ -76,20 +71,21 @@ struct StitchingView: View {
 
         return HStack(spacing: 14) {
             ZStack {
+                Circle()
+                    .fill((isCurrent ? Theme.cyan : Color.white).opacity(isCurrent ? 0.16 : 0.08))
+                    .frame(width: 30, height: 30)
                 if isDone {
                     Image(systemName: "checkmark")
                         .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(.green)
-                } else if isCurrent {
-                    ProgressView()
-                        .tint(.white)
+                        .foregroundStyle(Theme.mint)
                 } else {
-                    Circle()
-                        .fill(Color.white.opacity(0.2))
-                        .frame(width: 6, height: 6)
+                    Image(systemName: Self.symbol(for: stage))
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(isCurrent ? Theme.cyan : .white.opacity(0.35))
+                        .symbolRenderingMode(.hierarchical)
                 }
             }
-            .frame(width: 22, height: 22)
+            .glow(Theme.cyan.opacity(isCurrent ? 1 : 0), radius: isCurrent ? 8 : 0)
 
             Text(stage.rawValue)
                 .font(.system(size: 14, weight: isCurrent ? .semibold : .regular, design: .rounded))
@@ -97,6 +93,18 @@ struct StitchingView: View {
 
             Spacer()
         }
-        .animation(.easeInOut(duration: 0.25), value: vm.stage)
+        .animation(Theme.spring, value: vm.stage)
+    }
+
+    // MARK: - Stage → SF Symbol
+
+    private static func symbol(for stage: StitchStage) -> String {
+        switch stage {
+        case .loading:      return "photo.stack"
+        case .undistorting: return "camera.aperture"
+        case .exposure:     return "sun.max"
+        case .projecting:   return "globe"
+        case .finalizing:   return "sparkles"
+        }
     }
 }

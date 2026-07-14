@@ -1,8 +1,9 @@
 import SwiftUI
 import UIKit
 
-/// The main capture screen: live camera, floating guide points, central reticle,
-/// progress bar, stability indicator and a cancel button.
+/// The main capture screen: live camera under a scanner overlay, floating guide
+/// points, the precision reticle, the live 360° globe (PiP) framed by a rotating
+/// HUD ring, progress, and a cancel button.
 struct CaptureView: View {
 
     @StateObject private var vm: CaptureViewModel
@@ -14,8 +15,8 @@ struct CaptureView: View {
     @State private var lastCrash: String? = CrashReporter.lastCrash()
     @State private var didCopyCrash = false
 
-    init(distribution: SphereDistribution = .default) {
-        _vm = StateObject(wrappedValue: CaptureViewModel(distribution: distribution))
+    init(mode: GuideMode = .dynamic) {
+        _vm = StateObject(wrappedValue: CaptureViewModel(mode: mode))
     }
 
     var body: some View {
@@ -26,11 +27,39 @@ struct CaptureView: View {
 
                 CaptureOverlay(guide: vm.guide)
                     .ignoresSafeArea()
+
+                // Scanner overlay: sweeping line + corner brackets over the camera.
+                ScanlineOverlay()
+                    .ignoresSafeArea()
+                    .opacity(0.9)
+
+                // Vignette for depth + legibility of the HUD.
+                RadialGradient(colors: [.clear, .black.opacity(0.5)],
+                               center: .center, startRadius: 210, endRadius: 620)
+                    .ignoresSafeArea()
                     .allowsHitTesting(false)
 
                 ReticleView(state: vm.reticle,
-                            stability: vm.stabilityScore,
+                            confidence: Double(vm.captureConfidence),
                             pulse: vm.guide.capturePulse)
+
+                // Why capture isn't firing right now — surfaced from the gate.
+                if let hint = vm.statusHint {
+                    Label(hint, systemImage: "scope")
+                        .font(.App.caption)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16).padding(.vertical, 9)
+                        .glassPanel(cornerRadius: Theme.R.pill, tint: Theme.amber)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .offset(y: 96)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: 0.2), value: hint)
+                }
+
+                // Live, growing 360° globe (picture-in-picture). Fills in as you
+                // capture and rotates with the phone.
+                liveGlobePiP
 
                 VStack(spacing: 0) {
                     topBar
@@ -39,7 +68,8 @@ struct CaptureView: View {
                                     captured: vm.capturedCount,
                                     total: vm.totalPoints,
                                     eta: vm.etaSeconds,
-                                    stability: vm.stabilityScore)
+                                    stability: vm.stabilityScore,
+                                    coverageFraction: vm.usesCoverage ? vm.coverageFraction : nil)
                     if vm.canFinish {
                         finishButton
                             .padding(.top, 14)
@@ -59,6 +89,7 @@ struct CaptureView: View {
                         .allowsHitTesting(true)
                 }
             }
+            .tint(Theme.cyan)
             .onAppear {
                 guard !didStart else { return }
                 didStart = true
@@ -71,13 +102,12 @@ struct CaptureView: View {
                 Task { await vm.start() }
             }
             // Stop the camera the instant the app is backgrounded — iOS kills
-            // apps that keep capturing while suspended (a major "app just closes"
-            // cause). Restart on return.
+            // apps that keep capturing while suspended. Restart on return.
             .onChange(of: scenePhase) { phase in
                 if phase == .background { vm.suspend() }
                 else if phase == .active { vm.resume() }
             }
-            .alert("Capture Error", isPresented: Binding(
+            .alert("Erro de captura", isPresented: Binding(
                 get: { vm.errorMessage != nil },
                 set: { shown in if !shown { vm.dismissError() } }
             )) {
@@ -86,6 +116,41 @@ struct CaptureView: View {
                 Text(vm.errorMessage ?? "")
             }
         }
+    }
+
+    // MARK: - Live globe PiP
+
+    /// The live globe on a dark disc, wrapped by a rotating tick ring whose arc
+    /// fills with sphere coverage. A glass badge reports the %.
+    private var liveGlobePiP: some View {
+        VStack(spacing: 6) {
+            ZStack {
+                Circle()
+                    .fill(Theme.ink.opacity(0.55))
+                    .frame(width: 132, height: 132)
+                LiveMeshPreview { renderer, manager in
+                    vm.attachLiveGlobe(renderer: renderer, manager: manager)
+                }
+                .frame(width: 116, height: 116)
+                .clipShape(Circle())
+                HUDRing(tickCount: 40, rotationSeconds: 20,
+                        fill: vm.fractionComplete, color: Theme.cyan)
+                    .frame(width: 132, height: 132)
+            }
+            .frame(width: 132, height: 132)
+            .shadow(color: .black.opacity(0.5), radius: 10)
+
+            Text("GLOBO \(Int((vm.fractionComplete * 100).rounded()))%")
+                .font(.App.micro)
+                .tracking(1)
+                .foregroundStyle(.white.opacity(0.85))
+                .padding(.horizontal, 8).padding(.vertical, 3)
+                .glassPanel(cornerRadius: Theme.R.pill)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+        .padding(.top, 64)
+        .padding(.trailing, 20)
+        .allowsHitTesting(false)
     }
 
     // MARK: - Top bar
@@ -103,72 +168,78 @@ struct CaptureView: View {
             vm.cancel()
         } label: {
             Image(systemName: "xmark")
-                .font(.system(size: 16, weight: .bold))
+                .font(.system(size: 15, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(width: 44, height: 44)
-                .background(.ultraThinMaterial, in: Circle())
-                .overlay(Circle().stroke(.white.opacity(0.2), lineWidth: 1))
+                .glassPanel(cornerRadius: 22)
         }
         .shadow(color: .black.opacity(0.4), radius: 6)
     }
 
-    /// Manual escape hatch: build the 360° view now with the photos taken so far
-    /// (appears after the first capture). Lets the user reach the viewer even if
-    /// the auto-gate is slow.
+    /// Manual escape hatch: build the 360° view now with the photos taken so far.
     private var finishButton: some View {
         Button {
             vm.finishCapture()
         } label: {
-            Label("Finish & build 360°", systemImage: "checkmark.circle.fill")
+            Label("Finalizar e montar 360°", systemImage: "checkmark.circle.fill")
                 .font(.system(size: 16, weight: .semibold, design: .rounded))
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 14)
-                .background(.blue.gradient, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-                .shadow(color: .blue.opacity(0.4), radius: 10)
         }
+        .buttonStyle(HoloButton(gradient: Theme.successColors, cornerRadius: Theme.R.md))
     }
 
     // MARK: - Crash banner
 
-    /// Shows the persisted reason the previous launch crashed, with Copy (to
-    /// paste into a message to the dev / a bug report) and Dismiss. The text is
-    /// scrollable because the call stack can be long.
+    /// Shows the persisted reason the previous launch crashed. If the report is
+    /// empty, the app was almost certainly killed by iOS (memory / watchdog) —
+    /// SIGKILL cannot be caught — so we say so plainly.
     private func crashBanner(_ text: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        let isEmpty = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        return VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 6) {
                 Image(systemName: "exclamationmark.triangle.fill")
-                    .foregroundStyle(.yellow)
-                Text("Previous launch crashed")
+                    .foregroundStyle(Theme.amber)
+                Text("O app fechou na última vez")
                     .font(.system(size: 13, weight: .bold))
                 Spacer()
             }
+
             ScrollView {
-                Text(text)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                if isEmpty {
+                    Text("O app foi fechado pelo iOS sem deixar motivo — quase sempre é um encerramento por memória (SIGKILL não pode ser capturado).\n\n• Feche outros apps e tente de novo.\n• O detalhe real está em Ajustes → Privacidade e Segurança → Análises e Melhorias → Dados de Análise → Panorama360 (.ips).")
+                        .font(.system(size: 11))
+                        .foregroundStyle(.white.opacity(0.9))
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text(text)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(.white.opacity(0.85))
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
-            .frame(maxHeight: 160)
+            .frame(maxHeight: 170)
 
             HStack(spacing: 10) {
-                Button {
-                    UIPasteboard.general.string = text
-                    didCopyCrash = true
-                } label: {
-                    Label(didCopyCrash ? "Copied" : "Copy",
-                          systemImage: didCopyCrash ? "checkmark" : "doc.on.doc")
-                        .font(.system(size: 12, weight: .semibold))
-                        .padding(.horizontal, 12).padding(.vertical, 6)
+                if !isEmpty {
+                    Button {
+                        UIPasteboard.general.string = text
+                        Haptics.shared.captured()
+                        didCopyCrash = true
+                    } label: {
+                        Label(didCopyCrash ? "Copiado ✓" : "Copiar",
+                              systemImage: didCopyCrash ? "checkmark" : "doc.on.doc")
+                            .font(.system(size: 12, weight: .semibold))
+                            .padding(.horizontal, 12).padding(.vertical, 6)
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(.white)
                 }
-                .buttonStyle(.bordered)
-                .tint(.white)
 
                 Button {
                     CrashReporter.clear()
                     lastCrash = nil
                 } label: {
-                    Label("Dismiss", systemImage: "xmark")
+                    Label("Fechar", systemImage: "xmark")
                         .font(.system(size: 12, weight: .semibold))
                         .padding(.horizontal, 12).padding(.vertical, 6)
                 }
@@ -177,10 +248,7 @@ struct CaptureView: View {
             }
         }
         .padding(14)
-        .background(.red.opacity(0.85), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(.white.opacity(0.2), lineWidth: 1))
-        .shadow(color: .black.opacity(0.5), radius: 10)
+        .glassPanel(cornerRadius: Theme.R.lg, tint: Color(red: 1.0, green: 0.34, blue: 0.34))
     }
 }
 
@@ -194,24 +262,23 @@ private struct StabilityIndicator: View {
             HStack(spacing: 4) {
                 ForEach(0..<5) { i in
                     Capsule()
-                        .fill(barColor(for: i))
-                        .frame(width: 8, height: 14 + CGFloat(i) * 4)
+                        .fill(barStyle(for: i))
+                        .frame(width: 7, height: 12 + CGFloat(i) * 4)
                 }
             }
-            Text("STABILITY")
-                .font(.system(size: 9, weight: .semibold, design: .rounded))
+            Text("ESTABILIDADE")
+                .font(.App.micro)
                 .tracking(1.5)
                 .foregroundStyle(.white.opacity(0.7))
         }
         .padding(12)
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(.white.opacity(0.12), lineWidth: 1))
+        .glassPanel(cornerRadius: Theme.R.md)
         .animation(.easeOut(duration: 0.15), value: score)
     }
 
-    private func barColor(for index: Int) -> Color {
-        let activeCount = Int(score * 5)
-        return index < activeCount ? .green : .white.opacity(0.18)
+    private func barStyle(for index: Int) -> AnyShapeStyle {
+        index < Int(score * 5)
+            ? AnyShapeStyle(Theme.progress)
+            : AnyShapeStyle(Color.white.opacity(0.18))
     }
 }

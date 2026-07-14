@@ -1,4 +1,5 @@
 import UIKit
+import AudioToolbox
 
 /// Centralised haptic feedback for the capture flow.
 /// All generators are pre-prepared on first use to minimise latency.
@@ -35,6 +36,13 @@ public final class Haptics {
         impactRigid.impactOccurred(intensity: 1.0)
         notify.notificationOccurred(.success)
         impactRigid.prepare()
+    }
+
+    /// Subtle camera-shutter sound (system ID 1108). No audio asset bundled, and
+    /// it honours the mute switch. Played alongside `captured()` for the
+    /// per-capture feedback sequence.
+    public func shutterSound() {
+        AudioServicesPlaySystemSound(1108)
     }
 
     /// Capture aborted or session cancelled.

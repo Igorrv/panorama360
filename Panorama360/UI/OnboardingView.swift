@@ -18,39 +18,41 @@ struct OnboardingView: View {
 
     private let cards: [Card] = [
         Card(icon: "pano.fill",
-             title: "Capture a 360° space",
-             body: "Panorama360 guides you through a ring of glowing dots floating over your camera. Photograph each one and it builds an interactive 360° view of the room.",
-             accent: .blue),
+             title: "Escaneie um ambiente 360°",
+             body: "O Panorama360 te guia por pontos brilhantes sobre a câmera. Conforme você fotografa cada um, o ambiente vai se montando aos poucos em um globo 360° — uma vaga após a outra, como um quebra-cabeça.",
+             accent: Theme.cyan),
         Card(icon: "smartphone",
-             title: "Hold the phone upright",
-             body: "Stand in the middle of the room. Hold the phone vertically at chest height, roughly at arm's length. You stay in one spot — only the phone rotates.",
-             accent: .teal),
+             title: "Segure o celular na vertical",
+             body: "Fique no centro do cômodo. Segure o celular na vertical, na altura do peito, a um braço de distância. Você fica parado no mesmo lugar — só o celular gira.",
+             accent: Theme.violet),
         Card(icon: "arrow.triangle.2.circlepath.camera",
-             title: "Aim, then hold still",
-             body: "Slowly turn to bring a dot to the centre. When it turns blue, STOP and hold steady. The photo fires by itself when you're still and in focus — there is no shutter button.",
-             accent: .yellow),
+             title: "Mire e fique parado",
+             body: "Vire devagar para trazer um ponto ao centro. Quando ele ficar verde e o anel de mira se completar, PARE e segure firme. A foto sai sozinha quando você está parado e focado — não há botão de disparo.",
+             accent: Theme.amber),
         Card(icon: "checkmark.seal.fill",
-             title: "One room to start",
-             body: "For your first room you'll capture a short ring of 8 dots. Finish them all (or tap Finish) and the app stitches your 360° panorama. Then the full app unlocks.",
-             accent: .green)
+             title: "Comece com um cômodo",
+             body: "No primeiro cômodo você captura um anel curto de 8 pontos. A cada foto o globo se preenche; ao final (ou tocando em Finalizar) o panorama 360° fica pronto e o app completo desbloqueia.",
+             accent: Theme.mint)
     ]
 
     var body: some View {
         ZStack {
-            backgroundGradient
+            HoloBackground()
             VStack(spacing: 0) {
                 TabView(selection: $page) {
                     ForEach(0..<cards.count, id: \.self) { i in
                         cardView(cards[i]).tag(i)
                     }
                 }
-                .tabViewStyle(.page(indexDisplayMode: .always))
-                .indexViewStyle(.page(backgroundDisplayMode: .always))
+                .tabViewStyle(.page(indexDisplayMode: .never))
+
+                pageIndicator
+                    .padding(.bottom, 18)
 
                 actionArea
                     .padding(.horizontal, 24)
                     .padding(.bottom, 34)
-                    .padding(.top, 8)
+                    .padding(.top, 4)
             }
         }
     }
@@ -60,27 +62,57 @@ struct OnboardingView: View {
     private func cardView(_ card: Card) -> some View {
         VStack(spacing: 22) {
             Spacer()
-            ZStack {
-                Circle()
-                    .fill(card.accent.opacity(0.16))
-                    .frame(width: 150, height: 150)
-                Image(systemName: card.icon)
-                    .font(.system(size: 60, weight: .regular))
-                    .foregroundStyle(card.accent.gradient)
-                    .shadow(color: card.accent.opacity(0.6), radius: 18)
+            hero(card)
+            Spacer()
+            VStack(spacing: 14) {
+                Text(card.title)
+                    .font(.App.title)
+                    .foregroundStyle(.white)
+                    .multilineTextAlignment(.center)
+                Text(card.body)
+                    .font(.App.body)
+                    .foregroundStyle(.white.opacity(0.82))
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
             }
-            Text(card.title)
-                .font(.system(size: 24, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-                .multilineTextAlignment(.center)
-            Text(card.body)
-                .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(.white.opacity(0.8))
-                .multilineTextAlignment(.center)
-                .lineSpacing(4)
-                .padding(.horizontal, 30)
+            .padding(24)
+            .frame(maxWidth: 360)
+            .glassPanel(cornerRadius: Theme.R.lg, tint: card.accent)
             Spacer()
             Spacer()
+        }
+        .padding(.horizontal, 20)
+    }
+
+    /// Hero icon inside a rotating tick ring with a soft glow.
+    private func hero(_ card: Card) -> some View {
+        ZStack {
+            Circle()
+                .fill(RadialGradient(colors: [card.accent.opacity(0.45), .clear],
+                                     center: .center, startRadius: 0, endRadius: 95))
+                .frame(width: 190, height: 190)
+            HUDRing(tickCount: 36, rotationSeconds: 18, color: card.accent)
+                .frame(width: 152, height: 152)
+            Image(systemName: card.icon)
+                .font(.system(size: 58, weight: .regular))
+                .foregroundStyle(LinearGradient(colors: [card.accent, Theme.cyan],
+                                                startPoint: .top, endPoint: .bottom))
+                .shadow(color: card.accent.opacity(0.6), radius: 18)
+        }
+    }
+
+    // MARK: - Page indicator
+
+    private var pageIndicator: some View {
+        HStack(spacing: 8) {
+            ForEach(0..<cards.count, id: \.self) { i in
+                Capsule()
+                    .fill(i == page
+                          ? AnyShapeStyle(Theme.aurora)
+                          : AnyShapeStyle(Color.white.opacity(0.25)))
+                    .frame(width: i == page ? 28 : 8, height: 8)
+                    .animation(Theme.spring, value: page)
+            }
         }
     }
 
@@ -92,51 +124,37 @@ struct OnboardingView: View {
                 Button {
                     router.startTutorial()
                 } label: {
-                    Label("Start my first room", systemImage: "play.fill")
+                    Label("Começar meu primeiro cômodo", systemImage: "play.fill")
                         .font(.system(size: 17, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(.blue.gradient, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                 }
+                .buttonStyle(HoloButton(gradient: Theme.auroraColors, cornerRadius: Theme.R.md))
+
                 Button {
                     router.skipOnboarding()
                 } label: {
-                    Text("Skip — use full capture")
+                    Text("Pular — usar captura completa")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.white.opacity(0.6))
                         .padding(.vertical, 6)
                 }
             } else {
                 Button {
-                    withAnimation { page = min(page + 1, cards.count - 1) }
+                    withAnimation(Theme.spring) { page = min(page + 1, cards.count - 1) }
                 } label: {
-                    Text("Next")
+                    Text("Avançar")
                         .font(.system(size: 17, weight: .semibold, design: .rounded))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 15)
-                        .background(.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-                        .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                    .stroke(.white.opacity(0.18), lineWidth: 1))
                 }
+                .buttonStyle(HoloButton(gradient: nil, cornerRadius: Theme.R.md))
+
                 Button {
                     router.skipOnboarding()
                 } label: {
-                    Text("Skip")
+                    Text("Pular")
                         .font(.system(size: 14, weight: .medium))
                         .foregroundStyle(.white.opacity(0.5))
                         .padding(.vertical, 6)
                 }
             }
         }
-    }
-
-    private var backgroundGradient: some View {
-        LinearGradient(
-            colors: [Color(red: 0.05, green: 0.07, blue: 0.14),
-                     Color.black],
-            startPoint: .top, endPoint: .bottom)
-            .ignoresSafeArea()
     }
 }

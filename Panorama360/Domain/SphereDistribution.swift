@@ -19,12 +19,15 @@ public struct SphereDistribution: Codable, Equatable, Sendable {
         self.includePoles = includePoles
     }
 
-    /// Default layout: 5 bands, ~24° yaw step, poles included → ~60 points.
+    /// Default layout for a real room: 3 bands (−40°/0°/+40°) tuned for the
+    /// ultra-wide (~120° FOV), no poles → ~18 points. (The earlier 5-band/60-
+    /// point default was far too many for a hand-held first room and made the
+    /// overlay/UI churn.) Poles omitted so the user only rotates + tilts mildly.
     public static let `default` = SphereDistribution(
-        pitchBands: [60, 30, 0, -30, -60].map { radians($0) },
-        yawStep: radians(24),
-        overlap: 0.35,
-        includePoles: true
+        pitchBands: [40, 0, -40].map { radians($0) },
+        yawStep: radians(40),
+        overlap: 0.4,
+        includePoles: false
     )
 
     /// Denser preset (~90–100 points) for higher-quality output.

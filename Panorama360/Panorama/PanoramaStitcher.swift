@@ -2,11 +2,11 @@ import Foundation
 
 /// Coarse pipeline stages surfaced in the stitching UI.
 public enum StitchStage: String, Sendable, CaseIterable {
-    case loading      = "Loading images"
-    case undistorting = "Correcting lens"
-    case exposure     = "Matching exposure"
-    case projecting   = "Projecting onto sphere"
-    case finalizing   = "Finalizing"
+    case loading      = "Carregando imagens"
+    case undistorting = "Corrigindo lente"
+    case exposure     = "Equalizando exposição"
+    case projecting   = "Projetando na esfera"
+    case finalizing   = "Finalizando"
 
     public var order: Int {
         StitchStage.allCases.firstIndex(of: self) ?? 0

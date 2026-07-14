@@ -129,8 +129,18 @@ public final class CameraEngine: NSObject {
         for input in session.inputs { session.removeInput(input) }
         for output in session.outputs { session.removeOutput(output) }
 
-        guard let device = AVCaptureDevice.default(.builtInWideAngleCamera,
-                                                   for: .video, position: .back) else {
+        // Prefer the ultra-wide (0.5x, "grande angular", ~120° FOV) so each shot
+        // covers far more of the sphere and every guide point is reachable while
+        // rotating in place. Fall back to the standard wide-angle on devices
+        // without an ultra-wide lens.
+        let device: AVCaptureDevice
+        if let ultra = AVCaptureDevice.default(.builtInUltraWideCamera,
+                                                for: .video, position: .back) {
+            device = ultra
+        } else if let wide = AVCaptureDevice.default(.builtInWideAngleCamera,
+                                                      for: .video, position: .back) {
+            device = wide
+        } else {
             throw CameraError.noRearCamera
         }
         videoDevice = device

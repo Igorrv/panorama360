@@ -53,16 +53,16 @@ public struct CaptureGate: Sendable {
     public var requireFocusSettled: Bool
     public var requireExposureSettled: Bool
 
-    /// Defaults tuned so a hand-held phone can realistically satisfy all
-    /// conditions at once: ~7° alignment window, moderate stability, and
-    /// focus/exposure simply *settled* (which they are ~0.5 s after you stop
-    /// moving). The earlier 4.5°/0.72 combo almost never coincided → the gate
-    /// never fired → "scanning didn't work".
-    public init(alignedDistance: Double = radians(7),
-                minSharpness: Float = 12,
-                minStability: Double = 0.5,
-                requireFocusSettled: Bool = true,
-                requireExposureSettled: Bool = true) {
+    /// Defaults tuned so a hand-held phone can realistically satisfy the
+    /// conditions at once. Focus/exposure are NOT hard blockers — continuous
+    /// autofocus on iOS reports "adjusting" so often that requiring them
+    /// "settled" made the gate almost never fire. The sharpness check still
+    /// rejects genuinely blurry frames, so quality is protected by that instead.
+    public init(alignedDistance: Double = radians(8),
+                minSharpness: Float = 10,
+                minStability: Double = 0.4,
+                requireFocusSettled: Bool = false,
+                requireExposureSettled: Bool = false) {
         self.alignedDistance = alignedDistance
         self.minSharpness = minSharpness
         self.minStability = minStability

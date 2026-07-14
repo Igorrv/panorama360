@@ -31,8 +31,8 @@ public struct AlignmentThresholds: Sendable, Equatable {
     /// Default tuned to match the relaxed `CaptureGate` window so the reticle
     /// turns "aligned" at the same moment the gate is allowed to fire.
     public static let `default` = AlignmentThresholds(
-        nearDistance: radians(26),    // ~26°
-        alignedDistance: radians(7)   // ~7°  (matches CaptureGate.alignedDistance)
+        nearDistance: radians(28),    // ~28°
+        alignedDistance: radians(8)   // ~8°  (matches CaptureGate.alignedDistance)
     )
 
     /// Resolve a state from an angular distance to target.
