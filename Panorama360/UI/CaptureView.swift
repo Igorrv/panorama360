@@ -25,6 +25,11 @@ struct CaptureView: View {
                 CameraPreview(session: vm.camera.session, orientation: .portrait)
                     .ignoresSafeArea()
 
+                // Dark Scanner: the capture session keeps running underneath
+                // (so photos + the sharpness gate still work), but the user sees
+                // pure #000000 with floating holographic nodes — no live feed.
+                Color.black.ignoresSafeArea()
+
                 CaptureOverlay(guide: vm.guide)
                     .ignoresSafeArea()
 
@@ -32,12 +37,6 @@ struct CaptureView: View {
                 ScanlineOverlay()
                     .ignoresSafeArea()
                     .opacity(0.9)
-
-                // Vignette for depth + legibility of the HUD.
-                RadialGradient(colors: [.clear, .black.opacity(0.5)],
-                               center: .center, startRadius: 210, endRadius: 620)
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
 
                 ReticleView(state: vm.reticle,
                             confidence: Double(vm.captureConfidence),
@@ -94,7 +93,7 @@ struct CaptureView: View {
                 guard !didStart else { return }
                 didStart = true
                 vm.setViewport(geo.size)
-                vm.onComplete = { router.goStitching($0) }
+                vm.onComplete = { router.goWorld($0) }
                 // From the tutorial, cancel returns to onboarding; otherwise a fresh capture.
                 vm.onCancel = {
                     if router.tutorialActive { router.goOnboarding() } else { router.goCapture() }

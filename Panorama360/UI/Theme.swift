@@ -13,6 +13,7 @@ enum Theme {
     static let violet = Color(red: 0.55, green: 0.45, blue: 1.0)
     static let mint   = Color(red: 0.20, green: 0.95, blue: 0.45)
     static let amber  = Color(red: 1.00, green: 0.80, blue: 0.20)
+    static let gold   = Color(red: 1.00, green: 0.78, blue: 0.25)
     static let ink    = Color(red: 0.03, green: 0.04, blue: 0.09)
 
     // MARK: - Gradients
@@ -50,7 +51,7 @@ enum Theme {
         case .idle:     return cyan
         case .near:     return amber
         case .aligned:  return mint
-        case .captured: return .clear
+        case .captured: return gold
         }
     }
 

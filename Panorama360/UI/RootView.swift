@@ -26,6 +26,11 @@ struct RootView: View {
                     .transition(.asymmetric(
                         insertion: .move(edge: .bottom).combined(with: .opacity),
                         removal: .opacity))
+            case .world(let session):
+                NodeGalaxyView(session: session)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.92).combined(with: .opacity),
+                        removal: .opacity))
             case .viewer(let url):
                 PanoramaViewerView(url: url)
                     .transition(.asymmetric(

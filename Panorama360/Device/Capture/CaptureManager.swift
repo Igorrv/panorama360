@@ -5,17 +5,25 @@ import CoreGraphics
 
 /// Serialises photo capture + on-disk persistence so the gate can never
 /// double-fire. One capture in flight at a time.
+///
+/// **Memory model.** Each capture is encoded to JPEG @0.85 and written on a
+/// dedicated low-priority background queue, inside an `autoreleasepool`, so the
+/// decoded buffer (a full-res frame, ~tens of MB) is freed the instant the file
+/// lands — never retained across captures. This is what keeps the scanner under
+/// the iOS memory ceiling (the prior SIGKILL/OOM path).
 public actor CaptureManager {
 
     public enum CaptureError: LocalizedError {
         case busy
         case noPhotoOutput
-        case writeFailed
+        case cameraNoData
+        case writeFailed(String)
         public var errorDescription: String? {
             switch self {
-            case .busy: return "A capture is already in progress."
-            case .noPhotoOutput: return "Camera not ready."
-            case .writeFailed: return "Failed to save the photo."
+            case .busy:                 return "Uma captura já está em andamento."
+            case .noPhotoOutput:        return "A câmera não está pronta."
+            case .cameraNoData:         return "A câmera não retornou dados — tente novamente."
+            case .writeFailed(let d):   return "Não foi possível salvar a foto: \(d)"
             }
         }
     }
@@ -23,6 +31,11 @@ public actor CaptureManager {
     private let camera: CameraEngine
     private let store: SessionStore
     private var inFlight = false
+
+    /// Low-priority persistence queue — keeps encoding/writing off the capture
+    /// path and the main thread.
+    private static let persistQueue = DispatchQueue(label: "com.teleport.capture.persist",
+                                                     qos: .utility)
 
     public init(camera: CameraEngine, store: SessionStore) {
         self.camera = camera
@@ -39,15 +52,19 @@ public actor CaptureManager {
 
         let photo = try await camera.capturePhoto()
         let imagesDir = store.imagesDirectory(for: sessionID)
-        let url: URL
+
+        let (url, width, height): (URL, Int, Int)
         do {
-            url = try ImageWriter.write(photo: photo, to: imagesDir, name: point.id.uuidString)
+            (url, width, height) = try await Self.persist(photo: photo,
+                                                           to: imagesDir,
+                                                           name: point.id.uuidString)
+        } catch ImageWriterError.noData {
+            throw CaptureError.cameraNoData
         } catch {
             Log.capture.error("Write failed: \(error.localizedDescription, privacy: .public)")
-            throw CaptureError.writeFailed
+            throw CaptureError.writeFailed(error.localizedDescription)
         }
 
-        let (width, height) = Self.photoDimensions(photo)
         let intrinsics = camera.intrinsics(forPhotoWidth: width, height: height)
 
         return CaptureSample(
@@ -63,17 +80,26 @@ public actor CaptureManager {
         )
     }
 
-    private static func photoDimensions(_ photo: AVCapturePhoto) -> (Int, Int) {
-        if let cg = photo.cgImageRepresentation() {
-            return (cg.width, cg.height)
+    /// Validates the directory, encodes JPEG @0.85 and writes it — all on the
+    /// low-priority queue, inside an `autoreleasepool`. The AVCapturePhoto's
+    /// decoded buffer is freed before this returns.
+    private static func persist(photo: AVCapturePhoto,
+                                to dir: URL,
+                                name: String) async throws -> (URL, Int, Int) {
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<(URL, Int, Int), Error>) in
+            persistQueue.async {
+                let result: Result<(URL, Int, Int), Error>
+                do {
+                    let tuple = try autoreleasepool {
+                        try ImageWriter.ensureDirectory(dir)
+                        return try ImageWriter.writeJPEG(from: photo, to: dir, name: name)
+                    }
+                    result = .success((tuple.url, tuple.width, tuple.height))
+                } catch {
+                    result = .failure(error)
+                }
+                cont.resume(with: result)
+            }
         }
-        if let data = photo.fileDataRepresentation(),
-           let source = CGImageSourceCreateWithData(data as CFData, nil),
-           let props = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
-           let w = props[kCGImagePropertyPixelWidth] as? Int,
-           let h = props[kCGImagePropertyPixelHeight] as? Int {
-            return (w, h)
-        }
-        return (4032, 3024) // fallback typical wide still
     }
 }

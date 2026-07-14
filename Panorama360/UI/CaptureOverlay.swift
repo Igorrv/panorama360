@@ -16,12 +16,17 @@ struct CaptureOverlay: View {
                 let center = CGPoint(x: size.width / 2, y: size.height / 2)
                 var activeTarget: (CGPoint, Color)?
 
-                for point in guide.overlayPoints where !point.captured {
+                for point in guide.overlayPoints {
                     guard let position = point.position else { continue }
-                    drawPoint(&context, at: position, overlay: point)
-                    if activeTarget == nil,
-                       point.state == .near || point.state == .aligned {
-                        activeTarget = (position, Self.color(for: point.state))
+                    if point.captured {
+                        // Scanned/synced nodes stay visible in gold.
+                        drawCaptured(&context, at: position)
+                    } else {
+                        drawPoint(&context, at: position, overlay: point)
+                        if activeTarget == nil,
+                           point.state == .near || point.state == .aligned {
+                            activeTarget = (position, Self.color(for: point.state))
+                        }
                     }
                 }
 
@@ -77,6 +82,23 @@ struct CaptureOverlay: View {
                            with: .color(color.opacity(0.35)),
                            style: StrokeStyle(lineWidth: 1))
         }
+    }
+
+    /// A scanned/synced node: compact gold disc with a check — stays visible
+    /// after capture so the user sees their progress across the sphere.
+    private func drawCaptured(_ context: inout GraphicsContext, at center: CGPoint) {
+        let color = Theme.gold
+        let r: CGFloat = 9
+        let rect = CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)
+        context.fill(Path(ellipseIn: rect), with: .color(color.opacity(0.20)))
+        context.stroke(Path(ellipseIn: rect), with: .color(color.opacity(0.9)),
+                       style: StrokeStyle(lineWidth: 1.6))
+        let symbol = Image(systemName: "checkmark")
+        let resolved = context.resolve(
+            Text(symbol)
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(color))
+        context.draw(resolved, at: center)
     }
 
     private func drawCheck(_ context: inout GraphicsContext, at center: CGPoint, alpha: CGFloat) {

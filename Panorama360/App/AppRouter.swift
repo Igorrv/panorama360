@@ -9,6 +9,7 @@ public final class AppRouter: ObservableObject {
         case onboarding
         case capture
         case stitching(PanoramaSession)
+        case world(PanoramaSession)
         case viewer(URL)
 
         public static func == (lhs: Route, rhs: Route) -> Bool {
@@ -16,6 +17,7 @@ public final class AppRouter: ObservableObject {
             case (.onboarding, .onboarding): return true
             case (.capture, .capture): return true
             case (.stitching(let a), .stitching(let b)): return a.id == b.id
+            case (.world(let a), .world(let b)): return a.id == b.id
             case (.viewer(let a), .viewer(let b)): return a == b
             default: return false
             }
@@ -88,6 +90,13 @@ public final class AppRouter: ObservableObject {
 
     public func goStitching(_ session: PanoramaSession) {
         route = .stitching(session)
+    }
+
+    /// Land in the SceneKit node galaxy — the photos as a connected galaxy of
+    /// glowing nodes. This is the new default post-capture screen (lighter than
+    /// stitching a full 360°, and an immersive "point cloud" view of the scan).
+    public func goWorld(_ session: PanoramaSession) {
+        route = .world(session)
     }
 
     public func goViewer(_ url: URL) {
