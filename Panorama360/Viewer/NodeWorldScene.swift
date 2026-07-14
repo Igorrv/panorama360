@@ -90,7 +90,7 @@ final class NodeWorldScene {
             }
         }
         let source = SCNGeometrySource(vertices: verts)
-        let indices: [Int32] = stride(from: 0, to: verts.count, by: 2).flatMap { [$0, $0 + 1] }
+        let indices: [Int32] = (0..<verts.count).map { Int32($0) }
         let indexData = indices.withUnsafeBufferPointer { Data(buffer: $0) }
         let element = SCNGeometryElement(data: indexData,
                                          primitiveType: .line,

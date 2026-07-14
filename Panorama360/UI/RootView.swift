@@ -45,6 +45,7 @@ struct RootView: View {
         switch route {
         case .onboarding: return "onboarding"
         case .capture:    return "capture"
+        case .world:      return "world"
         case .stitching:  return "stitching"
         case .viewer:     return "viewer"
         }
