@@ -26,14 +26,15 @@ struct CircularProgressView: View {
 
             // Rotating scan-glow behind the fill — keeps the ring "alive".
             TimelineView(.animation) { ctx in
-                let deg = (ctx.date.timeIntervalSinceReferenceDate * 42)
-                    .truncatingRemainder(dividingBy: 360)
                 Circle()
                     .trim(from: 0, to: 0.22)
                     .stroke(
-                        LinearGradient(colors: [Theme.cyan.opacity(0), Theme.cyan.opacity(0.55)]),
+                        LinearGradient(colors: [Theme.cyan.opacity(0), Theme.cyan.opacity(0.55)],
+                                       startPoint: .leading, endPoint: .trailing),
                         style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-                    .rotationEffect(.degrees(deg))
+                    .rotationEffect(.degrees(
+                        (ctx.date.timeIntervalSinceReferenceDate * 42)
+                            .truncatingRemainder(dividingBy: 360)))
                     .blur(radius: 4)
                     .opacity(0.8)
             }
