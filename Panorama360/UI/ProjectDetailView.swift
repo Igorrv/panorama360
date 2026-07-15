@@ -133,7 +133,8 @@ private struct SceneRow: View {
     var body: some View {
         HStack(spacing: 14) {
             ZStack {
-                Circle().fill(Theme.auroraGradient.opacity(0.3))
+                Circle().fill(LinearGradient(colors: Theme.auroraColors.map { $0.opacity(0.3) },
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
                 Text("\(index)")
                     .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundColor(.white)

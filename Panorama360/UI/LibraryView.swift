@@ -134,7 +134,8 @@ private struct ProjectCard: View {
         VStack(alignment: .leading, spacing: 10) {
             ZStack {
                 RoundedRectangle(cornerRadius: Theme.R.md)
-                    .fill(Theme.auroraGradient.opacity(0.32))
+                    .fill(LinearGradient(colors: Theme.auroraColors.map { $0.opacity(0.32) },
+                                         startPoint: .topLeading, endPoint: .bottomTrailing))
                 Image(systemName: "pano.fill")
                     .font(.system(size: 30))
                     .foregroundColor(.white.opacity(0.85))
