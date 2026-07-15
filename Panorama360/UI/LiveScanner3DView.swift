@@ -103,8 +103,23 @@ struct LiveScanner3DView: View {
         // Capture a stable reference — the closure must not capture the struct
         // snapshot of `self`.
         let router = self.router
-        vm.onComplete = { router.goWorld($0) }     // node galaxy → "Montar panorama"
-        vm.onCancel = { router.goCapture() }        // abort → fresh scan
+        // In project ("add scene") mode a finished capture goes straight to
+        // stitching so it becomes a scene; standalone captures land in the node
+        // galaxy as before.
+        vm.onComplete = { session in
+            if router.captureContext != nil {
+                router.goStitching(session)
+            } else {
+                router.goWorld(session)
+            }
+        }
+        vm.onCancel = {
+            if router.captureContext != nil {
+                router.cancelAddScene()
+            } else {
+                router.goCapture()
+            }
+        }
         Task { await vm.start() }
     }
 

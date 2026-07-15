@@ -17,6 +17,9 @@ struct RootView: View {
                     .transition(.asymmetric(
                         insertion: .opacity.combined(with: .scale(scale: 0.96)),
                         removal: .opacity))
+            case .library:
+                LibraryView()
+                    .transition(.opacity)
             case .capture:
                 if router.tutorialActive {
                     CaptureView(mode: .fixed(.tutorial))
@@ -39,6 +42,16 @@ struct RootView: View {
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.92).combined(with: .opacity),
                         removal: .opacity))
+            case .projectDetail(let id):
+                ProjectDetailView(projectID: id)
+                    .id(id)
+                    .transition(.opacity)
+            case .tourViewer(let id):
+                TourViewerView(projectID: id)
+                    .id(id)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.92).combined(with: .opacity),
+                        removal: .opacity))
             case .viewer(let url):
                 PanoramaViewerView(url: url)
                     .transition(.asymmetric(
@@ -51,11 +64,14 @@ struct RootView: View {
 
     private func routeTag(_ route: AppRouter.Route) -> String {
         switch route {
-        case .onboarding: return "onboarding"
-        case .capture:    return "capture"
-        case .world:      return "world"
-        case .stitching:  return "stitching"
-        case .viewer:     return "viewer"
+        case .onboarding:    return "onboarding"
+        case .library:       return "library"
+        case .capture:       return "capture"
+        case .world:         return "world"
+        case .projectDetail: return "projectDetail"
+        case .tourViewer:    return "tourViewer"
+        case .stitching:     return "stitching"
+        case .viewer:        return "viewer"
         }
     }
 }

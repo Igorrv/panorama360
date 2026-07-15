@@ -35,7 +35,15 @@ struct StitchingView: View {
         .onAppear {
             guard !didStart else { return }
             didStart = true
-            vm.onComplete = { router.goViewer($0) }
+            vm.onComplete = { url in
+                // Project ("add scene") mode: commit the stitched session as a
+                // new scene and return to the project. Standalone: open viewer.
+                if router.captureContext != nil {
+                    router.commitAddScene(session: session)
+                } else {
+                    router.goViewer(url)
+                }
+            }
             vm.run(session: session)
         }
         .alert("Falha ao montar",

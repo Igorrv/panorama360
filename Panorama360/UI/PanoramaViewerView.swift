@@ -98,7 +98,7 @@ struct PanoramaViewerView: View {
                 // Reaching the viewer = a panorama was built; that unlocks the
                 // full app for future launches and clears the tutorial flag.
                 router.completeOnboarding()
-                router.goCapture()
+                router.goLibrary()
             } label: {
                 Group {
                     if router.tutorialActive {
@@ -219,39 +219,5 @@ private struct ViewerBrackets: Shape {
     }
 }
 
-// MARK: - Metal container
-
-private struct MetalContainer: UIViewRepresentable {
-
-    let url: URL
-    let onReady: (PanoramaRenderer) -> Void
-    let onResize: (CGSize) -> Void
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeUIView(context: Context) -> MTKView {
-        let view = MTKView()
-        view.device = MTLCreateSystemDefaultDevice()
-        view.colorPixelFormat = .bgra8Unorm
-        view.framebufferOnly = true
-        view.enableSetNeedsDisplay = false
-        view.isPaused = false                  // continuous rendering
-        view.preferredFramesPerSecond = 60
-        view.backgroundColor = .black
-
-        if let device = view.device, let renderer = PanoramaRenderer(device: device) {
-            context.coordinator.renderer = renderer   // retain (delegate is weak)
-            renderer.loadPanogram(at: url)
-            view.delegate = renderer
-            onResize(view.bounds.size)
-            onReady(renderer)
-        }
-        return view
-    }
-
-    func updateUIView(_ uiView: MTKView, context: Context) {}
-
-    final class Coordinator {
-        var renderer: PanoramaRenderer?
-    }
-}
+// MetalContainer was extracted to UI/Components/MetalContainer.swift so the tour
+// viewer can reuse the same Metal sphere host.
