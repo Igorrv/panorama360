@@ -75,6 +75,9 @@ public final class CaptureViewModel: ObservableObject {
     // Routing closures (set by the container).
     public var onComplete: ((PanoramaSession) -> Void)?
     public var onCancel: (() -> Void)?
+    /// Stream A bridge: delivers each 256-px thumbnail (nodeUUID → image) the
+    /// instant it is extracted, for progressive live node texturing.
+    public var onThumbnail: ((UUID, UIImage) -> Void)?
 
     // MARK: - Init
 
@@ -121,6 +124,12 @@ public final class CaptureViewModel: ObservableObject {
             return
         }
         Haptics.shared.prepare()
+
+        // Stream A: forward each 256 thumbnail (nodeUUID → image) to the live
+        // scanner the instant it is extracted, on the main actor.
+        await captureManager.setThumbnailHandler { [weak self] id, image in
+            Task { @MainActor in self?.onThumbnail?(id, image) }
+        }
 
         motion.onUpdate = { [weak self] orient in
             Task { @MainActor in self?.handle(orient) }
@@ -189,6 +198,21 @@ public final class CaptureViewModel: ObservableObject {
         camera.stop()
         Haptics.shared.captured()
         onComplete?(session)
+    }
+
+    /// Manual capture: fires immediately for the target you're aiming at,
+    /// bypassing the stability/sharpness blockers (the auto-gate can stall in low
+    /// light or with minor shake) but keeping the cooldown so it can't spam. The
+    /// photo lands on the globe at your real aim direction — lets you deliberately
+    /// "scan this section." The point captured is the nearest un-captured guide
+    /// target, already tracked each frame in `guide.alignment.pointID`.
+    public func captureNow() async {
+        guard !isCapturing, session != nil, let orientation = latestOrientation else { return }
+        let now = Date().timeIntervalSince1970
+        guard (now - lastCaptureTime) > cooldown else { return }
+        guard let pid = guide.alignment.pointID,
+              let point = guide.points.first(where: { $0.id == pid }) else { return }
+        await capture(point: point, orientation: orientation)
     }
 
     public var canFinish: Bool { guide.capturedCount >= 1 }

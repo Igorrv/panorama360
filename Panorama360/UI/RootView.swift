@@ -18,9 +18,17 @@ struct RootView: View {
                         insertion: .opacity.combined(with: .scale(scale: 0.96)),
                         removal: .opacity))
             case .capture:
-                CaptureView(mode: router.tutorialActive ? .fixed(.tutorial) : .dynamic)
-                    .id(router.captureGeneration)
-                    .transition(.opacity)
+                if router.tutorialActive {
+                    CaptureView(mode: .fixed(.tutorial))
+                        .id(router.captureGeneration)
+                        .transition(.opacity)
+                } else {
+                    // Live 3D Projection Scanner (real capture): pure-black
+                    // wireframe grid that fills in photo-by-photo as nodes lock.
+                    LiveScanner3DView()
+                        .id(router.captureGeneration)
+                        .transition(.opacity)
+                }
             case .stitching(let session):
                 StitchingView(session: session)
                     .transition(.asymmetric(
