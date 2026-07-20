@@ -1,5 +1,6 @@
 import SwiftUI
 import MetalKit
+import UIKit
 
 /// Picture-in-picture Metal surface that shows the live, growing 360° globe
 /// during capture. Hosts a `SpatialFragmentRenderer` and a
@@ -26,7 +27,7 @@ struct LiveMeshPreview: UIViewRepresentable {
         view.enableSetNeedsDisplay = false
         view.isPaused = false                  // continuous rendering
         // ProMotion (iPhone Pro) ⇒ 120 Hz; capped to the device's max elsewhere.
-        view.preferredFramesPerSecond = min(120, view.device?.maxFramesPerSecond ?? 60)
+        view.preferredFramesPerSecond = min(120, UIScreen.main.maximumFramesPerSecond)
         view.backgroundColor = .black
 
         guard let device = view.device,

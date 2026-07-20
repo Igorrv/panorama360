@@ -1,5 +1,6 @@
 import SwiftUI
 import MetalKit
+import UIKit
 
 /// Shared Metal host for the 360° equirectangular sphere: builds one `MTKView`
 /// + `PanoramaRenderer`, loads the initial panorama, and hands the renderer back
@@ -21,7 +22,7 @@ struct MetalContainer: UIViewRepresentable {
         view.enableSetNeedsDisplay = false
         view.isPaused = false                  // continuous rendering
         // ProMotion (iPhone Pro) ⇒ 120 Hz; capped to the device's max elsewhere.
-        view.preferredFramesPerSecond = min(120, view.device?.maxFramesPerSecond ?? 60)
+        view.preferredFramesPerSecond = min(120, UIScreen.main.maximumFramesPerSecond)
         view.backgroundColor = .black
 
         if let device = view.device, let renderer = PanoramaRenderer(device: device) {

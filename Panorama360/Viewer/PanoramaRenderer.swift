@@ -100,7 +100,7 @@ public final class PanoramaRenderer: NSObject, MTKViewDelegate {
             .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)
         ]
         do {
-            let texture = try textureLoader.newTexture(cgImage: cgImage, options: opts)
+            let texture = try await textureLoader.newTexture(cgImage: cgImage, options: opts)
             Log.viewer.info("Prepared panorama \(url.lastPathComponent, privacy: .public)")
             return texture
         } catch {
