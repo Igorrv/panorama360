@@ -9,14 +9,32 @@ public struct CameraIntrinsics: Codable, Equatable, Sendable {
     /// Brown–Conrady radial distortion coefficients (best-effort; ARKit does
     /// not expose them directly, so these default to 0 and may be refined).
     public let k1, k2: Float
+    /// Third radial coefficient (refines the periphery). Defaults to 0; decoded
+    /// from old archives as 0 when the key is absent (see `init(from:)`).
+    public let k3: Float
 
-    public init(fx: Float, fy: Float, cx: Float, cy: Float, k1: Float = 0, k2: Float = 0) {
+    public init(fx: Float, fy: Float, cx: Float, cy: Float, k1: Float = 0, k2: Float = 0, k3: Float = 0) {
         self.fx = fx; self.fy = fy
         self.cx = cx; self.cy = cy
-        self.k1 = k1; self.k2 = k2
+        self.k1 = k1; self.k2 = k2; self.k3 = k3
     }
 
     public static let zero = CameraIntrinsics(fx: 0, fy: 0, cx: 0, cy: 0)
+
+    private enum CodingKeys: String, CodingKey { case fx, fy, cx, cy, k1, k2, k3 }
+
+    /// Custom decode so archives written before k1/k2/k3 (or before k3) still
+    /// load — missing keys default to 0 instead of throwing.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        fx = try c.decode(Float.self, forKey: .fx)
+        fy = try c.decode(Float.self, forKey: .fy)
+        cx = try c.decode(Float.self, forKey: .cx)
+        cy = try c.decode(Float.self, forKey: .cy)
+        k1 = try c.decodeIfPresent(Float.self, forKey: .k1) ?? 0
+        k2 = try c.decodeIfPresent(Float.self, forKey: .k2) ?? 0
+        k3 = try c.decodeIfPresent(Float.self, forKey: .k3) ?? 0
+    }
 }
 
 /// A captured photo plus the geometry needed to project it onto the panorama sphere.

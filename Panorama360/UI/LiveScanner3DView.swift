@@ -22,7 +22,9 @@ struct LiveScanner3DView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var didStart = false
 
-    init(mode: GuideMode = .fixed(.default)) {
+    /// Default route is the full-sphere real-estate preset (ceiling + floor
+    /// included) so the stitched panorama renders the whole environment.
+    init(mode: GuideMode = .fixed(.realEstate)) {
         _vm = StateObject(wrappedValue: CaptureViewModel(mode: mode))
     }
 
@@ -64,6 +66,21 @@ struct LiveScanner3DView: View {
                         .allowsHitTesting(false)
                         .transition(.opacity)
                         .animation(.easeInOut(duration: 0.2), value: hint)
+                }
+
+                // Pole prompt — "Aponte para o teto/chão" when the nearest
+                // un-captured target is near the zenith/nadir (full-sphere scans).
+                if let pole = vm.poleHint {
+                    Label(pole, systemImage: "arrow.up.arrow.down.circle")
+                        .font(.App.caption)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16).padding(.vertical, 9)
+                        .glassPanel(cornerRadius: Theme.R.pill, tint: Theme.mint)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .offset(y: 150)
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
+                        .animation(.easeInOut(duration: 0.2), value: pole)
                 }
 
                 VStack(spacing: 0) {
@@ -148,10 +165,22 @@ struct LiveScanner3DView: View {
             Divider().frame(height: 18).overlay(Color.white.opacity(0.3))
             Text("\(Int((vm.fractionComplete * 100).rounded()))%")
                 .font(.App.hud)
+            if vm.includesPoles {
+                Divider().frame(height: 18).overlay(Color.white.opacity(0.3))
+                poleGlyph("arrow.up.circle.fill", active: vm.ceilingCaptured)
+                poleGlyph("arrow.down.circle.fill", active: vm.floorCaptured)
+            }
         }
         .foregroundColor(.white)
         .padding(.horizontal, 14).padding(.vertical, 9)
         .glassPanel(cornerRadius: Theme.R.pill)
+    }
+
+    /// Teto/chão coverage glyph — mint when that pole shot is captured, dim otherwise.
+    private func poleGlyph(_ name: String, active: Bool) -> some View {
+        Image(systemName: name)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundColor(active ? Theme.mint : .white.opacity(0.3))
     }
 
     /// Manual shutter (always available — scan a section on demand) plus the

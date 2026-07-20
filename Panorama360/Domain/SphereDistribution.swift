@@ -30,6 +30,19 @@ public struct SphereDistribution: Codable, Equatable, Sendable {
         includePoles: false
     )
 
+    /// Production layout for real-estate scanning: 4 latitude bands (+75°/+40°/
+    /// 0°/−40°) tuned for the ultra-wide (~120° FOV) **plus the zenith and nadir
+    /// poles** → ~24 points covering the FULL sphere (ceiling + floor included),
+    /// so the stitched panorama has no black holes at top/bottom. This is the
+    /// route `LiveScanner3DView` opens by default. `.default` is kept unchanged
+    /// for the lighter ring used elsewhere.
+    public static let realEstate = SphereDistribution(
+        pitchBands: [75, 40, 0, -40].map { radians($0) },
+        yawStep: radians(45),
+        overlap: 0.45,
+        includePoles: true
+    )
+
     /// Denser preset (~90–100 points) for higher-quality output.
     public static let dense = SphereDistribution(
         pitchBands: [70, 45, 20, 0, -20, -45, -70].map { radians($0) },

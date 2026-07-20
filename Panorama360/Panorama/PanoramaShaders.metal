@@ -97,6 +97,8 @@ fragment float4 divide_fragment(VertexOut in [[stage_in]],
                                 texture2d<float, access::sample> accum [[texture(0)]],
                                 sampler samp [[sampler(0)]]) {
     float4 acc = accum.sample(samp, in.uv);
-    if (acc.a <= 1e-4) return float4(0, 0, 0, 1);   // uncovered area → black
+    // Uncovered → alpha 0 (coverage mask). The live globe samples .rgb → still
+    // black; the authoritative stitch runs `PoleFiller` to dilate colour in.
+    if (acc.a <= 1e-4) return float4(0, 0, 0, 0);
     return float4(acc.rgb / acc.a, 1.0);
 }

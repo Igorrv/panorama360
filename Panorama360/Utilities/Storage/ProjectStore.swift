@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Flat-file JSON store for `Project` tours, mirroring `SessionStore`'s layout
 /// under `Documents/Panorama360/projects/`. Each project is one folder:
@@ -13,6 +14,17 @@ public final class ProjectStore {
     public let sessionStore: SessionStore
     private let encoder = JSONEncoder()
     private let decoder = JSONDecoder()
+
+    /// In-memory "is this scene's equirect present on disk?" cache, keyed by the
+    /// scene's source `sessionID`. `equirectURL(for:)` is queried during tour
+    /// navigation and list rendering; a `FileManager.fileExists` round-trip each
+    /// time is wasteful. Only **positive** hits are cached: a missing file is
+    /// re-probed every call, so a freshly stitched panorama is picked up at once
+    /// — important because stitching happens in a separate `StitchingViewModel`
+    /// with its own store instance that can't reach this cache. Drop entries
+    /// explicitly via `invalidateReadiness`/`invalidateAll` when a panorama is
+    /// known to be removed.
+    private let readinessCache = OSAllocatedUnfairLock(initialState: [UUID: Bool]())
 
     public init(rootDirectory: URL? = nil, sessionStore: SessionStore = SessionStore()) {
         if let rootDirectory {
@@ -86,7 +98,25 @@ public final class ProjectStore {
     /// nil if the session has no stitched panorama / the file is missing.
     public func equirectURL(for scene: TourScene) -> URL? {
         let url = sessionStore.equirectangularURL(for: scene.sessionID)
+        // Fast path: a known-present equirect skips the disk probe entirely.
+        if readinessCache.withLock({ $0[scene.sessionID] ?? false }) {
+            return url
+        }
+        // Slow path: probe the disk. Remember only positive hits so a panorama
+        // that appears later (stitched by another flow) is seen at once.
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        readinessCache.withLock { $0[scene.sessionID] = true }
         return url
+    }
+
+    /// Drops one session's cached readiness. Call when its panorama is deleted or
+    /// replaced and this same store instance previously served it as present.
+    public func invalidateReadiness(sessionID: UUID) {
+        readinessCache.withLock { $0.removeValue(forKey: sessionID) }
+    }
+
+    /// Drops the whole readiness cache. Call after a bulk re-stitch or delete.
+    public func invalidateAll() {
+        readinessCache.withLock { $0.removeAll() }
     }
 }

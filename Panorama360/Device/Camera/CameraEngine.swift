@@ -258,8 +258,13 @@ public final class CameraEngine: NSObject {
         }
         let hfov = Double(format.videoFieldOfView) * .pi / 180
         let fx = Float((Double(width) / 2) / tan(hfov / 2))
+        // Ultra-wide (~120°) carries strong barrel distortion; plain wide / any
+        // unknown lens → identity (no change). Gated by LensProfileTable.
+        let isUltraWide = device.deviceType == .builtInUltraWideCamera
+        let profile = LensProfileTable.profile(isUltraWide: isUltraWide)
         return CameraIntrinsics(fx: fx, fy: fx,
-                                cx: Float(width) / 2, cy: Float(height) / 2)
+                                cx: Float(width) / 2, cy: Float(height) / 2,
+                                k1: profile.k1, k2: profile.k2, k3: profile.k3)
     }
 
     // MARK: - Sample buffer handling

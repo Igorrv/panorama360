@@ -174,6 +174,46 @@ public enum Geometry {
         return (CGPoint(x: sx, y: sy), CGFloat(scale))
     }
 
+    /// Variant of `projectOnViewport` whose FOV convention **mirrors the panorama
+    /// renderer** (`viewer_vertex` in `Shaders.metal`), where `fovRadians` is the
+    /// VERTICAL field of view, `f = 1/tan(vfov/2)`, and the horizontal axis is
+    /// scaled by `1/aspect`. Use this for any overlay that must stay glued to a
+    /// texel on the Metal sphere (tour hotspots) — the `horizontalFOV` overload
+    /// above is correct for the capture guide (a real horizontal FOV) but drifts
+    /// radially toward centre on portrait screens when fed the viewer's vertical
+    /// FOV. Returns `(nil, 0)` when the direction is behind the camera.
+    public static func projectOnViewport(pointDir: SIMD3<Float>,
+                                         lookDir: SIMD3<Float>,
+                                         upHint: SIMD3<Float>,
+                                         verticalFOV: Double,
+                                         aspect: Double,
+                                         viewport: CGSize) -> (position: CGPoint?, scale: CGFloat) {
+        let fwd = simd_normalize(lookDir)
+        var right = simd_cross(fwd, simd_normalize(upHint))
+        if simd_length(right) < 1e-4 { right = SIMD3<Float>(1, 0, 0) }
+        right = simd_normalize(right)
+        let up = simd_cross(right, fwd)
+
+        let z = simd_dot(pointDir, fwd)
+        guard z > 1e-3 else { return (nil, 0) }
+
+        let x = simd_dot(pointDir, right) / z
+        let y = simd_dot(pointDir, up) / z
+
+        // Mirrors viewer_vertex: f = 1/tan(vfov/2); horizontal extent ÷ aspect,
+        // vertical extent plain — so the marker lands on the same screen point as
+        // the panorama texel beneath it at any viewport aspect.
+        let f = 1.0 / tan(verticalFOV / 2)
+        let halfW = Double(viewport.width) / 2
+        let halfH = Double(viewport.height) / 2
+        let sx = halfW + halfW * Double(x) * f / aspect
+        let sy = halfH - halfH * Double(y) * f
+
+        let radial = sqrt(x * x + y * y)
+        let scale = max(0.55, 1.25 - Double(radial) * 0.25)
+        return (CGPoint(x: sx, y: sy), CGFloat(scale))
+    }
+
     // MARK: - Yaw helpers
 
     /// Wraps an angle to (-π, π].

@@ -30,6 +30,10 @@ public final class CaptureViewModel: ObservableObject {
     /// Human-readable reason capture isn't firing right now (pt-BR). Shown under
     /// the reticle so a stall is self-diagnosing instead of silent.
     @Published public private(set) var statusHint: String?
+    /// Pole prompt (pt-BR) shown when the nearest un-captured target is near the
+    /// zenith ("Aponte para o teto") or nadir ("Aponte para o chão") — guides the
+    /// user to fill the full-sphere ceiling/floor shots so nothing renders black.
+    @Published public private(set) var poleHint: String?
     /// 0..1 capture confidence for the reticle ring (alignment + stability + sharpness).
     @Published public private(set) var captureConfidence: Float = 0
     /// Sphere coverage so far (dynamic mode); drives the progress bar.
@@ -41,6 +45,19 @@ public final class CaptureViewModel: ObservableObject {
 
     /// Whether the bottom bar should show coverage % instead of "X de Y".
     public var usesCoverage: Bool { guide.mode == .dynamic }
+
+    /// Whether the active distribution adds zenith/nadir poles (full-sphere).
+    public var includesPoles: Bool { guide.distribution.includePoles }
+    /// Whether the ceiling (zenith) / floor (nadir) pole shots are captured.
+    /// Drives the teto/chão glyphs in the coverage pill; re-read on every redraw
+    /// (triggered by `capturedCount` changing after each capture).
+    public var ceilingCaptured: Bool { poleCaptured(positive: true) }
+    public var floorCaptured: Bool { poleCaptured(positive: false) }
+
+    private func poleCaptured(positive: Bool) -> Bool {
+        let target = positive ? Double.pi / 2 : -Double.pi / 2
+        return guide.points.contains { abs($0.pitch - target) < 0.01 && $0.isCaptured }
+    }
 
     // MARK: - Dependencies
 
@@ -278,6 +295,7 @@ public final class CaptureViewModel: ObservableObject {
 
         let output = gate.evaluate(input)
         statusHint = hint(for: output.blockers, ready: output.ready)
+        poleHint = poleHint(for: guide.alignment.pointID)
         captureConfidence = CaptureConfidenceEngine.combine(
             alignment: guide.alignment.confidence,
             stability: latestStability.score,
@@ -305,6 +323,16 @@ public final class CaptureViewModel: ObservableObject {
         case .blurry:             return "Muito escuro/tremido — mais luz"
         case .cooldown:           return nil   // transient; don't show
         }
+    }
+
+    /// "Aponte para o teto/chão" when the active target is within ~20° of a pole.
+    private func poleHint(for pointID: UUID?) -> String? {
+        guard let pid = pointID,
+              let point = guide.points.first(where: { $0.id == pid }) else { return nil }
+        let pole = radians(70)
+        if point.pitch > pole { return "Aponte para o teto" }
+        if point.pitch < -pole { return "Aponte para o chão" }
+        return nil
     }
 
     // MARK: - Capture + live reconstruction

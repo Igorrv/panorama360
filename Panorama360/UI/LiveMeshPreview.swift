@@ -25,7 +25,8 @@ struct LiveMeshPreview: UIViewRepresentable {
         view.framebufferOnly = true
         view.enableSetNeedsDisplay = false
         view.isPaused = false                  // continuous rendering
-        view.preferredFramesPerSecond = 60
+        // ProMotion (iPhone Pro) ⇒ 120 Hz; capped to the device's max elsewhere.
+        view.preferredFramesPerSecond = min(120, view.device?.maxFramesPerSecond ?? 60)
         view.backgroundColor = .black
 
         guard let device = view.device,

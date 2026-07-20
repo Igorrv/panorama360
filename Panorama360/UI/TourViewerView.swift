@@ -18,19 +18,6 @@ struct TourViewerView: View {
     @State private var hideTask: Task<Void, Never>?
     @State private var gyroOn = false
 
-    // Link-authoring sheet state (seeded from the draft on appear).
-    @State private var linkTarget: TourScene?
-    @State private var linkLabel = ""
-    @State private var linkIcon = "arrow.right.circle.fill"
-
-    private static let icons: [(String, String)] = [
-        ("arrow.right.circle.fill", "Passagem"),
-        ("door.right.hand.open", "Porta"),
-        ("arrow.up.circle.fill", "Subir"),
-        ("arrow.down.circle.fill", "Descer"),
-        ("info.circle.fill", "Info")
-    ]
-
     init(projectID: UUID) {
         self.projectID = projectID
         _vm = StateObject(wrappedValue: TourViewerViewModel(projectID: projectID))
@@ -69,14 +56,30 @@ struct TourViewerView: View {
             Color.black.opacity(vm.fadeOpacity)
                 .ignoresSafeArea().allowsHitTesting(false)
 
+            // Loading spinner shown while the next scene decodes off the main
+            // thread behind the veil (only during multi-scene transitions).
+            if vm.isLoadingScene {
+                VStack(spacing: 14) {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .tint(.white)
+                        .scaleEffect(1.3)
+                    Text("Carregando cena...")
+                        .font(.App.caption)
+                        .foregroundColor(.white.opacity(0.85))
+                }
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+            }
+
             chrome
                 .opacity(chromeVisible ? 1 : 0)
                 .animation(Theme.spring, value: chromeVisible)
         }
         .tint(Theme.cyan)
         .onAppear { poke() }
-        .onDisappear { hideTask?.cancel(); vm.engine.stopGyro() }
-        .sheet(isPresented: $vm.showLinkSheet) { linkSheet }
+        .onDisappear { hideTask?.cancel(); vm.engine.stopGyro(); vm.detach() }
+        .sheet(isPresented: $vm.showLinkSheet) { TourLinkSheet(vm: vm) }
         .alert("Cena indisponível", isPresented: $vm.unavailableNotice) {
             Button("OK", role: .cancel) {}
         } message: { Text("O panorama desta cena ainda não está pronto.") }
@@ -191,99 +194,6 @@ struct TourViewerView: View {
             Text("Nenhuma cena pronta neste tour.")
                 .font(.App.caption).foregroundColor(.white.opacity(0.6))
         }
-    }
-
-    // MARK: - Link-authoring sheet
-
-    private var linkSheet: some View {
-        VStack(spacing: 18) {
-            Text("Novo ponto de passagem")
-                .font(.App.headline).foregroundColor(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            if vm.otherScenes().isEmpty {
-                Label("Adicione outra cena a este projeto antes de criar um link.",
-                      systemImage: "info.circle")
-                    .font(.App.caption).foregroundColor(.white.opacity(0.7))
-            } else {
-                targetPicker
-                iconRow
-                TextField("Rótulo (ex.: Cozinha)", text: $linkLabel)
-                    .textFieldStyle(.plain)
-                    .padding(12)
-                    .background(Color.white.opacity(0.08),
-                                in: RoundedRectangle(cornerRadius: Theme.R.md))
-                    .foregroundColor(.white)
-            }
-
-            Spacer(minLength: 0)
-
-            HStack(spacing: 12) {
-                Button("Cancelar", role: .cancel) { vm.cancelHotspot() }
-                    .frame(maxWidth: .infinity).padding(.vertical, 4)
-                    .glassPanel(cornerRadius: Theme.R.md)
-                Button {
-                    guard let t = linkTarget else { return }
-                    vm.commitHotspot(targetSceneID: t.id,
-                                     label: linkLabel.trimmingCharacters(in: .whitespaces).isEmpty
-                                            ? t.title : linkLabel,
-                                     icon: linkIcon)
-                } label: {
-                    Text("Criar link").frame(maxWidth: .infinity).padding(.vertical, 4)
-                }
-                .buttonStyle(HoloButton(gradient: Theme.auroraColors, cornerRadius: Theme.R.md))
-                .disabled(linkTarget == nil)
-            }
-        }
-        .padding(22)
-        .background(Color.black.ignoresSafeArea())
-        .onAppear { seedLinkSheet() }
-    }
-
-    private var targetPicker: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Cena de destino").font(.App.micro).foregroundColor(.white.opacity(0.6))
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(vm.otherScenes()) { scene in
-                        let sel = linkTarget?.id == scene.id
-                        Button { linkTarget = scene } label: {
-                            Text(scene.title).font(.App.caption)
-                                .foregroundColor(sel ? .black : .white)
-                                .padding(.horizontal, 14).padding(.vertical, 8)
-                                .background(sel ? AnyShapeStyle(Theme.mint) : AnyShapeStyle(Color.white.opacity(0.1)),
-                                            in: Capsule())
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var iconRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 10) {
-                ForEach(Self.icons, id: \.0) { icon, label in
-                    let sel = linkIcon == icon
-                    Button { linkIcon = icon } label: {
-                        VStack(spacing: 4) {
-                            Image(systemName: icon).font(.system(size: 20))
-                            Text(label).font(.system(size: 9))
-                        }
-                        .foregroundColor(sel ? .black : .white)
-                        .frame(width: 58, height: 50)
-                        .background(sel ? AnyShapeStyle(Theme.mint) : AnyShapeStyle(Color.white.opacity(0.08)),
-                                    in: RoundedRectangle(cornerRadius: Theme.R.sm))
-                    }
-                }
-            }
-        }
-    }
-
-    private func seedLinkSheet() {
-        if linkTarget == nil { linkTarget = vm.otherScenes().first }
-        linkLabel = vm.draftHotspot?.label ?? ""
-        if let icon = vm.draftHotspot?.iconName { linkIcon = icon }
     }
 
     // MARK: - Chrome auto-hide / gyro

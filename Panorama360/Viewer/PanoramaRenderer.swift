@@ -53,7 +53,11 @@ public final class PanoramaRenderer: NSObject, MTKViewDelegate {
         sdesc.magFilter = .linear
         sdesc.sAddressMode = .clampToEdge
         sdesc.tAddressMode = .clampToEdge
-        sampler = device.makeSamplerState(descriptor: sdesc)!
+        guard let samplerState = device.makeSamplerState(descriptor: sdesc) else {
+            Log.viewer.error("Could not create sampler state.")
+            return nil
+        }
+        sampler = samplerState
 
         super.init()
         uniforms.fovRadians = 1.2
@@ -77,6 +81,39 @@ public final class PanoramaRenderer: NSObject, MTKViewDelegate {
         } catch {
             Log.viewer.error("Texture load error: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Decodes the panorama and uploads its GPU texture OFF the calling thread.
+    /// `PanoramaRenderer` is non-isolated, so this body runs on a cooperative
+    /// background executor — moving the CGImage decode + texture upload that
+    /// `loadPanogram` does synchronously off the main thread during scene
+    /// transitions. Returns the prepared texture (nil on failure); the caller
+    /// swaps it in via `loadPrepared`. Does NOT touch the live `panoTexture`, so
+    /// the previous scene keeps rendering while this runs.
+    public func preparePanogram(at url: URL) async -> MTLTexture? {
+        guard let cgImage = MetalSphereProjector.loadCGImage(url) else {
+            Log.viewer.error("Could not load panorama image.")
+            return nil
+        }
+        let opts: [MTKTextureLoader.Option: Any] = [
+            .origin: MTKTextureLoader.Origin.bottomLeft,
+            .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)
+        ]
+        do {
+            let texture = try textureLoader.newTexture(cgImage: cgImage, options: opts)
+            Log.viewer.info("Prepared panorama \(url.lastPathComponent, privacy: .public)")
+            return texture
+        } catch {
+            Log.viewer.error("Texture prepare error: \(error.localizedDescription, privacy: .public)")
+            return nil
+        }
+    }
+
+    /// Atomically swaps an already-prepared texture (from `preparePanogram`) onto
+    /// the live `panoTexture`, releasing the old one. Synchronous + cheap — safe
+    /// to call on the main thread between frames during a transition.
+    public func loadPrepared(_ texture: MTLTexture?) {
+        panoTexture = texture
     }
 
     // MARK: - MTKViewDelegate

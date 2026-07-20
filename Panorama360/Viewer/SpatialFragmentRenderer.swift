@@ -66,7 +66,11 @@ public final class SpatialFragmentRenderer: NSObject, MTKViewDelegate {
         sdesc.magFilter = .linear
         sdesc.sAddressMode = .clampToEdge
         sdesc.tAddressMode = .clampToEdge
-        sampler = device.makeSamplerState(descriptor: sdesc)!
+        guard let samplerState = device.makeSamplerState(descriptor: sdesc) else {
+            Log.recon.error("Could not create sampler state.")
+            return nil
+        }
+        sampler = samplerState
 
         super.init()
         uniforms.fovRadians = 1.2          // ~69° — wide enough to read the PiP globe

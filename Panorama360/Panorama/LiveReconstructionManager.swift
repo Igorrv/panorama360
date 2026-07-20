@@ -36,10 +36,17 @@ public actor LiveReconstructionManager {
     private let sampler: MTLSamplerState
     private let textureLoader: MTKTextureLoader
     private let accumulator: MTLTexture
+    /// Optional lens undistortion pass (nil when Metal setup failed). Built in
+    /// `create` so the actor never touches a lazy var.
+    private let undistorter: Undistorter?
     private let outputSize: SIMD2<Int>
     /// False until the first successful accumulate pass; the first pass clears
     /// the accumulator, later passes load+add.
     private var cleared = false
+
+    /// Per-photo exposure gain (EMA-smoothed) so the live globe stays even as
+    /// lighting shifts mid-scan. Lives in the actor; only `add` touches it.
+    private let exposureTracker = LiveExposureTracker()
 
     /// Live preview resolution. Smaller than the stitcher's 4096×2048 so the
     /// per-capture passes are fast; the authoritative stitch re-runs at full size.
@@ -54,6 +61,7 @@ public actor LiveReconstructionManager {
                  textureLoader: MTKTextureLoader,
                  accumulator: MTLTexture,
                  previewTexture: MTLTexture,
+                 undistorter: Undistorter?,
                  outputSize: SIMD2<Int>) {
         self.device = device
         self.commandQueue = commandQueue
@@ -63,6 +71,7 @@ public actor LiveReconstructionManager {
         self.textureLoader = textureLoader
         self.accumulator = accumulator
         self.previewTexture = previewTexture
+        self.undistorter = undistorter
         self.outputSize = outputSize
     }
 
@@ -97,8 +106,9 @@ public actor LiveReconstructionManager {
         guard let accumulator = makeTexture(device: device, width: previewWidth, height: previewHeight,
                                             usage: [.shaderWrite, .shaderRead, .renderTarget]),
               let preview = makeTexture(device: device, width: previewWidth, height: previewHeight,
-                                        usage: [.shaderWrite, .shaderRead, .renderTarget]) else {
-            Log.recon.error("Could not allocate live-recon accumulator textures.")
+                                        usage: [.shaderWrite, .shaderRead, .renderTarget]),
+              let sampler = makeSampler(device: device) else {
+            Log.recon.error("Could not allocate live-recon Metal resources.")
             return nil
         }
 
@@ -107,10 +117,11 @@ public actor LiveReconstructionManager {
             commandQueue: commandQueue,
             accumulatePipeline: accumulatePipeline,
             dividePipeline: dividePipeline,
-            sampler: makeSampler(device: device),
+            sampler: sampler,
             textureLoader: MTKTextureLoader(device: device),
             accumulator: accumulator,
             previewTexture: preview,
+            undistorter: try? Undistorter(device: device, commandQueue: commandQueue),
             outputSize: size)
     }
 
@@ -126,15 +137,13 @@ public actor LiveReconstructionManager {
                     Log.recon.warning("Skipping unreadable live image \(sample.imageURL.lastPathComponent, privacy: .public)")
                     return
                 }
-                let photo = try textureLoader.newTexture(
-                    cgImage: cg,
-                    options: [.origin: MTKTextureLoader.Origin.topLeft,
-                              .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)])
+                let photo = try makePhotoTexture(cg: cg, sample: sample)
 
                 guard let buffer = commandQueue.makeCommandBuffer() else { return }
                 let loadAction: MTLLoadAction = cleared ? .load : .clear
+                let gain = exposureTracker.gain(for: sample.imageURL)
                 accumulate(into: accumulator, photo: photo, sample: sample,
-                           loadAction: loadAction, buffer: buffer)
+                           gain: gain, loadAction: loadAction, buffer: buffer)
                 cleared = true
                 buffer.commit()
                 buffer.waitUntilCompleted()   // retires the write; frees `photo`
@@ -155,6 +164,7 @@ public actor LiveReconstructionManager {
     public func reset() async {
         guard cleared else { return }
         cleared = false
+        exposureTracker.reset()
         // Next add() will .clear the accumulator; no extra command buffer needed.
     }
 
@@ -163,6 +173,7 @@ public actor LiveReconstructionManager {
     private func accumulate(into accumulator: MTLTexture,
                             photo: MTLTexture,
                             sample: CaptureSample,
+                            gain: Float,
                             loadAction: MTLLoadAction,
                             buffer: MTLCommandBuffer) {
         guard let encoder = buffer.makeRenderCommandEncoder(
@@ -174,7 +185,7 @@ public actor LiveReconstructionManager {
                                            sample.intrinsics.cx, sample.intrinsics.cy)
         uniforms.imageSize = SIMD2<Float>(Float(sample.width), Float(sample.height))
         uniforms.outputSize = SIMD2<Float>(Float(outputSize.x), Float(outputSize.y))
-        uniforms.exposureGain = 1.0
+        uniforms.exposureGain = gain
         uniforms.feather = 1.0
 
         encoder.setRenderPipelineState(accumulatePipeline)
@@ -194,6 +205,26 @@ public actor LiveReconstructionManager {
         encoder.drawPrimitives(type: .triangle, vertexStart: 0, vertexCount: 6)
         encoder.endEncoding()
     }
+
+    /// Loads one photo, undistorting it first when a real lens profile is active
+    /// and the kill-switch is off. Identity intrinsics skip the pass — same raw
+    /// load as before 1.4. Output is topLeft, matching `accumulate_fragment`.
+    private func makePhotoTexture(cg: CGImage, sample: CaptureSample) throws -> MTLTexture {
+        let intr = sample.intrinsics
+        if !Self.undistortDisabled, let undistorter,
+           intr.k1 != 0 || intr.k2 != 0 || intr.k3 != 0 {
+            return try undistorter.undistort(cgImage: cg, intrinsics: intr)
+        }
+        return try textureLoader.newTexture(
+            cgImage: cg,
+            options: [.origin: MTKTextureLoader.Origin.topLeft,
+                      .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)])
+    }
+
+    /// Env `PANORAMA_DISABLE_UNDISTORT=1` disables the pass everywhere.
+    private static let undistortDisabled: Bool = {
+        ProcessInfo.processInfo.environment["PANORAMA_DISABLE_UNDISTORT"] != nil
+    }()
 
     // MARK: - Metal helpers (static so `create` can use them pre-init)
 
@@ -236,12 +267,12 @@ public actor LiveReconstructionManager {
         return try device.makeRenderPipelineState(descriptor: desc)
     }
 
-    private static func makeSampler(device: MTLDevice) -> MTLSamplerState {
+    private static func makeSampler(device: MTLDevice) -> MTLSamplerState? {
         let desc = MTLSamplerDescriptor()
         desc.minFilter = .linear
         desc.magFilter = .linear
         desc.sAddressMode = .clampToEdge
         desc.tAddressMode = .clampToEdge
-        return device.makeSamplerState(descriptor: desc)!
+        return device.makeSamplerState(descriptor: desc)
     }
 }

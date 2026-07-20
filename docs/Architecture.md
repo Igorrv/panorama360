@@ -72,7 +72,8 @@ All knobs live on `CaptureGate` — tune without touching UI.
 `PanoramaEngine` (actor) serializes GPU/disk work:
 
 ```
-samples[] → LensUndistortion → ExposureCompensator
+samples[] → Undistorter (Brown–Conrady, ultra-wide only; identity otherwise)
+         → ExposureCompensator
          → MetalSphereProjector (warp + blend onto equirect)
          → ImageWriter → session equirectangular URL
 ```

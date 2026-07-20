@@ -38,6 +38,12 @@ public final class MetalSphereProjector: PanoramaStitcher {
     private let dividePipeline: MTLRenderPipelineState
     private let sampler: MTLSamplerState
     private let textureLoader: MTKTextureLoader
+    /// Lens undistortion pass. Lazily built; an identity profile or the
+    /// kill-switch leaves it unused (zero overhead).
+    private lazy var undistorter: Undistorter? = try? Undistorter(device: device, commandQueue: commandQueue)
+    /// Hole-fill pass for the final equirect (dilates colour into gaps).
+    private lazy var poleFiller: PoleFiller? = try? PoleFiller(
+        device: device, commandQueue: commandQueue, width: options.outputWidth, height: options.outputHeight)
 
     public init(options: Options = Options()) throws {
         self.options = options
@@ -63,7 +69,10 @@ public final class MetalSphereProjector: PanoramaStitcher {
             device: device, vertex: accumulateVert, fragment: divideFrag,
             format: .rgba16Float, blending: false)
 
-        sampler = Self.makeSampler(device: device)
+        guard let samplerState = Self.makeSampler(device: device) else {
+            throw StitchError.renderFailed
+        }
+        sampler = samplerState
         textureLoader = MTKTextureLoader(device: device)
     }
 
@@ -105,11 +114,9 @@ public final class MetalSphereProjector: PanoramaStitcher {
 
     // MARK: - Rendering
 
-    /// Streams photos one texture at a time. Loading every photo as a full-res
-    /// MTLTexture up front would peak at N × ~49 MB (≈ 900 MB for 18 shots) and
-    /// get the app jetsam-killed. Instead each photo is loaded inside an
-    /// autoreleasepool, accumulated into the canvas, then freed before the next.
-    /// Peak VRAM ≈ 1 photo + 2 accumulators.
+    /// Streams photos one texture at a time inside an autoreleasepool (peak VRAM
+    /// ≈ 1 photo + 2 accumulators; loading all up front would be jetsam-killed).
+    /// The final equirect is hole-filled at the end.
     private func render(samples: [CaptureSample],
                         gains: [Float],
                         onProgress: @escaping @Sendable (Double) -> Void) throws -> MTLTexture {
@@ -119,12 +126,6 @@ public final class MetalSphereProjector: PanoramaStitcher {
                                           usage: [.shaderWrite, .shaderRead, .renderTarget])
         let final = try makeTexture(width: width, height: height,
                                     usage: [.shaderWrite, .shaderRead, .renderTarget, .pixelFormatView])
-
-        let origin: MTKTextureLoader.Origin = options.textureOriginTopLeft ? .topLeft : .bottomLeft
-        let loaderOpts: [MTKTextureLoader.Option: Any] = [
-            .origin: origin,
-            .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)
-        ]
 
         var cleared = false
         let total = max(samples.count, 1)
@@ -136,7 +137,7 @@ public final class MetalSphereProjector: PanoramaStitcher {
                     Log.stitch.warning("Skipping unreadable image \(sample.imageURL.lastPathComponent, privacy: .public)")
                     return
                 }
-                let photo = try textureLoader.newTexture(cgImage: cg, options: loaderOpts)
+                let photo = try makePhotoTexture(cg: cg, sample: sample)
 
                 guard let buffer = commandQueue.makeCommandBuffer() else { throw StitchError.renderFailed }
                 let gain = i < gains.count ? gains[i] : 1.0
@@ -158,6 +159,7 @@ public final class MetalSphereProjector: PanoramaStitcher {
         divide(accumulator: accumulator, into: final, buffer: buffer)
         buffer.commit()
         buffer.waitUntilCompleted()
+        poleFiller?.fill(final)   // dilate colour into alpha==0 gaps (no-op if disabled)
         return final
     }
 
@@ -217,6 +219,27 @@ public final class MetalSphereProjector: PanoramaStitcher {
         return texture
     }
 
+    /// Loads one photo, undistorting it first when the intrinsics carry a real
+    /// lens profile (and the kill-switch is off). Identity intrinsics skip the
+    /// pass — same raw-texture load as before, zero overhead. Output is topLeft.
+    private func makePhotoTexture(cg: CGImage, sample: CaptureSample) throws -> MTLTexture {
+        let intr = sample.intrinsics
+        if !Self.undistortDisabled, let undistorter,
+           intr.k1 != 0 || intr.k2 != 0 || intr.k3 != 0 {
+            return try undistorter.undistort(cgImage: cg, intrinsics: intr)
+        }
+        let origin: MTKTextureLoader.Origin = options.textureOriginTopLeft ? .topLeft : .bottomLeft
+        return try textureLoader.newTexture(
+            cgImage: cg,
+            options: [.origin: origin,
+                      .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)])
+    }
+
+    /// `PANORAMA_DISABLE_UNDISTORT=1` disables the pass everywhere (emergency revert).
+    private static let undistortDisabled: Bool = {
+        ProcessInfo.processInfo.environment["PANORAMA_DISABLE_UNDISTORT"] != nil
+    }()
+
     private static func makePipeline(device: MTLDevice,
                                      vertex: MTLFunction,
                                      fragment: MTLFunction,
@@ -239,13 +262,13 @@ public final class MetalSphereProjector: PanoramaStitcher {
         return try device.makeRenderPipelineState(descriptor: desc)
     }
 
-    private static func makeSampler(device: MTLDevice) -> MTLSamplerState {
+    private static func makeSampler(device: MTLDevice) -> MTLSamplerState? {
         let desc = MTLSamplerDescriptor()
         desc.minFilter = .linear
         desc.magFilter = .linear
         desc.sAddressMode = .clampToEdge
         desc.tAddressMode = .clampToEdge
-        return device.makeSamplerState(descriptor: desc)!
+        return device.makeSamplerState(descriptor: desc)
     }
 
     static func loadCGImage(_ url: URL) -> CGImage? {

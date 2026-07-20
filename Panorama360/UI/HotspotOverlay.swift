@@ -22,7 +22,7 @@ struct HotspotOverlay: View {
                     marker(for: p)
                         .position(pos)
                         .scaleEffect(p.scale)
-                        .opacity(targetAlive(p.hotspot) ? 1 : 0.3)
+                        .opacity(vm.targetExists(p.hotspot) ? 1 : 0.3)
                 }
             }
         }
@@ -39,7 +39,7 @@ struct HotspotOverlay: View {
                 HStack(spacing: 7) {
                     Image(systemName: h.iconName)
                         .font(.system(size: 14, weight: .bold))
-                    Text(vm.targetTitle(for: h))
+                    Text(vm.targetTitle(for: h) ?? "Cena removida")
                         .font(.App.caption)
                         .lineLimit(1)
                 }
@@ -50,7 +50,7 @@ struct HotspotOverlay: View {
                 .shadow(color: Theme.cyan.opacity(0.4), radius: 8)
                 .contentShape(Capsule())
             }
-            .disabled(editMode)
+            .disabled(editMode || !vm.targetExists(h))
 
             if editMode {
                 Button { onDelete(h.id) } label: {
@@ -62,10 +62,5 @@ struct HotspotOverlay: View {
                 .offset(x: 6, y: -6)
             }
         }
-    }
-
-    /// A hotspot pointing at a deleted scene shows but is dimmed + untappable.
-    private func targetAlive(_ h: Hotspot) -> Bool {
-        vm.targetTitle(for: h) != "Cena removida"
     }
 }

@@ -60,11 +60,12 @@ public final class ViewerEngine: ObservableObject {
     public func startGyro() {
         guard motion.isDeviceMotionAvailable, !gyroEnabled else { return }
         motion.deviceMotionUpdateInterval = 1.0 / 60
-        let queue = OperationQueue()
-        queue.qualityOfService = .userInteractive
-        motion.startDeviceMotionUpdates(to: queue) { [weak self] data, _ in
+        // Deliver on `.main` and assume main-actor isolation, mutating yaw/pitch
+        // directly — avoids the per-sample `Task { @MainActor in }` allocation
+        // the previous version did 60×/s. `.main` guarantees main-thread delivery.
+        motion.startDeviceMotionUpdates(to: .main) { [weak self] data, _ in
             guard let self, let data else { return }
-            Task { @MainActor in
+            MainActor.assumeIsolated {
                 self.yaw = -Float(data.attitude.yaw) * 0.8
                 self.pitch = Float(data.attitude.pitch) * 0.8
             }
