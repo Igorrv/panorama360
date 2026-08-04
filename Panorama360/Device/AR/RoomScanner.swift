@@ -163,7 +163,7 @@ public final class RoomScanner {
 
     /// Reads triangle indices, widening UInt16 → UInt32 as needed.
     private static func readFaces(_ e: GeoElement) -> [UInt32] {
-        let total = e.indexCount
+        let total = e.count * e.indexCountPerPrimitive
         let bytes = e.bytesPerIndex
         let base = e.buffer.contents()
         var out = [UInt32](); out.reserveCapacity(total)

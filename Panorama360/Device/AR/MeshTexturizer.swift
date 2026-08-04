@@ -213,10 +213,10 @@ private struct YUVPlanes {
         yStride = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0)
         cbcrStride = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 1)
         if let yPtr = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 0) {
-            yBase = yPtr.assumingMemoryBound(to: UInt8.self)
+            yBase = UnsafePointer(yPtr.assumingMemoryBound(to: UInt8.self))
         } else { yBase = nil }
         if let cPtr = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 1) {
-            cbcrBase = cPtr.assumingMemoryBound(to: UInt8.self)
+            cbcrBase = UnsafePointer(cPtr.assumingMemoryBound(to: UInt8.self))
         } else { cbcrBase = nil }
     }
 
@@ -259,7 +259,7 @@ private struct DepthMap {
         height = CVPixelBufferGetHeight(pb)
         stride = CVPixelBufferGetBytesPerRow(pb) / MemoryLayout<Float>.stride
         if let ptr = CVPixelBufferGetBaseAddress(pb) {
-            base = ptr.assumingMemoryBound(to: Float.self)
+            base = UnsafePointer(ptr.assumingMemoryBound(to: Float.self))
         } else { base = nil }
         // Depth map is lower-res than the captured image but is aligned to it.
         sx = Float(width) / Float(max(1, imgWidth))
