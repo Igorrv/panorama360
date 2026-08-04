@@ -52,6 +52,16 @@ struct RootView: View {
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.92).combined(with: .opacity),
                         removal: .opacity))
+            case .roomScan(let id):
+                RoomScanView(projectID: id)
+                    .id(id)
+                    .transition(.opacity)
+            case .meshWalk(let id):
+                MeshWalkView(projectID: id)
+                    .id(id)
+                    .transition(.asymmetric(
+                        insertion: .scale(scale: 0.92).combined(with: .opacity),
+                        removal: .opacity))
             case .viewer(let url):
                 PanoramaViewerView(url: url)
                     .transition(.asymmetric(
@@ -70,6 +80,8 @@ struct RootView: View {
         case .world:         return "world"
         case .projectDetail: return "projectDetail"
         case .tourViewer:    return "tourViewer"
+        case .roomScan:      return "roomScan"
+        case .meshWalk:      return "meshWalk"
         case .stitching:     return "stitching"
         case .viewer:        return "viewer"
         }

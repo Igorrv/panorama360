@@ -9,6 +9,7 @@ public final class ProjectDetailViewModel: ObservableObject {
     @Published public private(set) var project: Project?
     public let projectID: UUID
     private let store = ProjectStore()
+    private let meshStore = MeshStore()
 
     public init(projectID: UUID) {
         self.projectID = projectID
@@ -23,6 +24,9 @@ public final class ProjectDetailViewModel: ObservableObject {
     public var canStartTour: Bool {
         project?.scenes.contains(where: { equirectReady($0) }) ?? false
     }
+
+    /// True if this project has a saved LiDAR 3D mesh to walk through.
+    public var meshReady: Bool { meshStore.exists(for: projectID) }
 
     /// The scene the tour should open on (first ready scene).
     public func startScene() -> TourScene? {
@@ -45,5 +49,24 @@ public final class ProjectDetailViewModel: ObservableObject {
         project.updatedAt = Date()
         try? store.persist(project)
         reload()
+    }
+
+    /// Persists per-project branding (accent + broker identity). Blank text
+    /// fields collapse to nil so empty branding simply hides in the tour.
+    public func updateBranding(accentHex: String?,
+                               brokerName: String?,
+                               brokerContact: String?) {
+        guard var project else { return }
+        project.accentHex = accentHex
+        project.brokerName = clean(brokerName)
+        project.brokerContact = clean(brokerContact)
+        project.updatedAt = Date()
+        try? store.persist(project)
+        reload()
+    }
+
+    /// Trims whitespace and returns nil for empty strings (keeps archives tidy).
+    private func clean(_ text: String?) -> String? {
+        text?.trimmingCharacters(in: .whitespacesAndNewlines).flatMap { $0.isEmpty ? nil : $0 }
     }
 }

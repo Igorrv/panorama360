@@ -3,10 +3,9 @@ import SwiftUI
 import simd
 import Metal
 
-/// Drives the multi-scene tour: owns a `ViewerEngine` + the active `PanoramaRenderer`,
-/// manages the current scene, performs fade-through-black transitions by swapping
-/// the renderer's equirect, projects hotspots onto the viewport for the overlay,
-/// and authors hotspots in edit mode. Persists hotspot edits via `ProjectStore`.
+/// Drives the multi-scene tour: owns a `ViewerEngine` + `PanoramaRenderer`,
+/// runs fade-through-black scene transitions, projects hotspots for the overlay,
+/// and authors hotspots in edit mode. Persists edits via `ProjectStore`.
 @MainActor
 public final class TourViewerViewModel: ObservableObject {
 
@@ -19,19 +18,20 @@ public final class TourViewerViewModel: ObservableObject {
     @Published public var draftHotspot: Hotspot?
     @Published public var showLinkSheet: Bool = false
     @Published public var unavailableNotice: Bool = false
-    /// True while a scene's equirect is decoding + uploading off the main thread
-    /// during a transition — drives the "Carregando cena..." spinner.
+    /// True while a scene's equirect decodes off-main — drives the spinner.
     @Published public var isLoadingScene: Bool = false
+    /// "Passeio automático" — advances one scene every few seconds.
+    @Published public var autoPlay: Bool = false
 
     public let projectID: UUID
     private let store = ProjectStore()
     private(set) var renderer: PanoramaRenderer?
     private var transitionTask: Task<Void, Never>?
     private var prewarmTask: Task<Void, Never>?
-    /// Speculatively decoded target textures (scene.id → prepared equirect) so a
-    /// tap swaps instantly instead of decoding behind the fade. VRAM-bounded.
+    /// Speculatively decoded targets (scene.id → equirect) for instant swaps.
     private var prewarmCache: [UUID: MTLTexture] = [:]
     private static let prewarmCap = 3
+    private lazy var autoPlayCoordinator = AutoPlayCoordinator { [weak self] in self?.next() }
     public private(set) var viewportSize: CGSize = .zero
 
     public init(projectID: UUID) {
@@ -77,15 +77,19 @@ public final class TourViewerViewModel: ObservableObject {
 
     // MARK: - Scene navigation
 
+    /// "Passeio automático": advances one scene every few seconds, looping.
+    public func setAutoPlay(_ on: Bool) {
+        autoPlay = on
+        autoPlayCoordinator.setActive(on)
+    }
+
     public func next() {
-        guard let project else { return }
-        guard !project.scenes.isEmpty else { return }
+        guard let project, !project.scenes.isEmpty else { return }
         goTo(index: (currentIndex + 1) % project.scenes.count)
     }
 
     public func previous() {
-        guard let project else { return }
-        guard !project.scenes.isEmpty else { return }
+        guard let project, !project.scenes.isEmpty else { return }
         goTo(index: (currentIndex - 1 + project.scenes.count) % project.scenes.count)
     }
 
@@ -95,10 +99,9 @@ public final class TourViewerViewModel: ObservableObject {
         goTo(index: idx)
     }
 
-    /// Fade-through-black with the equirect decode/upload moved off the main
-    /// thread: darken → prepare the next texture behind the veil (bounded by a
-    /// 5 s timeout) → swap + reset view → lighten. On timeout/failure the old
-    /// scene stays visible and `unavailableNotice` fires.
+    /// Fade-through-black with the equirect decode off-main: darken → prepare
+    /// behind the veil (5 s timeout) → swap + reset view → lighten. On failure
+    /// the old scene stays and `unavailableNotice` fires.
     private func goTo(index: Int) {
         guard let project, project.scenes.indices.contains(index) else { return }
         let scene = project.scenes[index]
@@ -111,7 +114,6 @@ public final class TourViewerViewModel: ObservableObject {
         transitionTask = Task { [weak self] in
             guard let self else { return }
             withAnimation(.easeOut(duration: 0.18)) { self.fadeOpacity = 1 }
-            // Let the fade land before the (possibly slow) decode kicks in.
             try? await Task.sleep(nanoseconds: 180_000_000)
             if Task.isCancelled { return }
 
@@ -136,12 +138,13 @@ public final class TourViewerViewModel: ObservableObject {
             self.engine.yaw = Float(scene.initialYaw)
             self.engine.pitch = Float(scene.initialPitch)
             withAnimation(.easeInOut(duration: 0.24)) { self.fadeOpacity = 0 }
-            self.prewarmTargets()   // speculate on this scene's links
+            self.prewarmTargets()
+            if self.autoPlay { self.autoPlayCoordinator.reschedule() }
         }
     }
 
     /// Speculatively decodes the current scene's reachable targets off-main so a
-    /// later tap swaps instantly. Capped to bound VRAM; cancelled on navigate/detach.
+    /// later tap swaps instantly (VRAM-capped; cancelled on navigate/detach).
     private func prewarmTargets() {
         prewarmTask?.cancel()
         let sceneID = currentScene?.id
@@ -164,9 +167,8 @@ public final class TourViewerViewModel: ObservableObject {
         }
     }
 
-    /// Runs the off-main texture prepare against a 5 s timeout. First to finish
-    /// (prepare or the timeout) wins; the loser is cancelled. Returns the
-    /// prepared texture or nil on timeout/failure.
+    /// Off-main texture prepare raced against a 5 s timeout. First to finish wins;
+    /// the loser is cancelled. Returns the texture or nil on timeout/failure.
     private func prepareBounded(url: URL) async -> MTLTexture? {
         guard let renderer else { return nil }
         return await withTaskGroup(of: MTLTexture?.self) { group -> MTLTexture? in
@@ -175,8 +177,7 @@ public final class TourViewerViewModel: ObservableObject {
                 try? await Task.sleep(nanoseconds: 5_000_000_000)
                 return nil
             }
-            // `group.next()` is `MTLTexture??`; unwrap the outer layer — the inner
-            // value is the texture (prepare won) or nil (timeout won).
+            // `group.next()` is `MTLTexture??` — unwrap the outer layer.
             if let winner = await group.next() {
                 group.cancelAll()
                 return winner
@@ -191,6 +192,7 @@ public final class TourViewerViewModel: ObservableObject {
     public func detach() {
         transitionTask?.cancel()
         prewarmTask?.cancel()
+        autoPlayCoordinator.setActive(false)
         prewarmTask = nil
         transitionTask = nil
         prewarmCache.removeAll()
@@ -243,13 +245,13 @@ public final class TourViewerViewModel: ObservableObject {
         showLinkSheet = false
     }
 
-    public func commitHotspot(targetSceneID: UUID, label: String, icon: String) {
+    public func commitHotspot(targetSceneID: UUID, label: String, icon: String, info: String?) {
         guard var draft = draftHotspot,
               var project,
               let sceneIdx = project.scenes.firstIndex(where: { $0.id == currentScene?.id }) else { return }
-        draft.label = label
-        draft.iconName = icon
+        draft.label = label; draft.iconName = icon
         draft.targetSceneID = targetSceneID
+        draft.info = info?.trimmingCharacters(in: .whitespacesAndNewlines).flatMap { $0.isEmpty ? nil : $0 }
         project.scenes[sceneIdx].hotspots.append(draft)
         project.updatedAt = Date()
         try? store.persist(project)
@@ -272,6 +274,16 @@ public final class TourViewerViewModel: ObservableObject {
     public func otherScenes() -> [TourScene] {
         guard let project, let cur = currentScene else { return [] }
         return project.scenes.filter { $0.id != cur.id }
+    }
+
+    /// Auto-connects every scene to its neighbours (capture order) and persists
+    /// the result. Idempotent — safe to tap repeatedly; manual links survive.
+    public func autoLinkAllScenes() {
+        guard var project else { return }
+        project = AutoLinker.autoLink(project)
+        try? store.persist(project)
+        self.project = project
+        if let id = currentScene?.id { currentScene = project.scene(with: id) }
     }
 
     public func targetTitle(for h: Hotspot) -> String? {

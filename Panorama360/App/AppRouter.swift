@@ -17,6 +17,8 @@ public final class AppRouter: ObservableObject {
         case viewer(URL)
         case projectDetail(UUID)
         case tourViewer(UUID)
+        case roomScan(UUID)
+        case meshWalk(UUID)
 
         public static func == (lhs: Route, rhs: Route) -> Bool {
             switch (lhs, rhs) {
@@ -28,6 +30,8 @@ public final class AppRouter: ObservableObject {
             case (.viewer(let a), .viewer(let b)): return a == b
             case (.projectDetail(let a), .projectDetail(let b)): return a == b
             case (.tourViewer(let a), .tourViewer(let b)): return a == b
+            case (.roomScan(let a), .roomScan(let b)): return a == b
+            case (.meshWalk(let a), .meshWalk(let b)): return a == b
             default: return false
             }
         }
@@ -117,6 +121,10 @@ public final class AppRouter: ObservableObject {
     public func goProjectDetail(_ id: UUID) { route = .projectDetail(id) }
 
     public func goTourViewer(_ id: UUID) { route = .tourViewer(id) }
+
+    public func goRoomScan(_ id: UUID) { route = .roomScan(id) }
+
+    public func goMeshWalk(_ id: UUID) { route = .meshWalk(id) }
 
     // MARK: - "Add scene" flow (capture → stitch → commit)
 

@@ -24,3 +24,7 @@ AuthKey_*.p8
 
 # Optional local OpenCV drop-in (large binary).
 **/opencv2.xcframework/
+
+# Local agent / IDE.
+.claude/
+

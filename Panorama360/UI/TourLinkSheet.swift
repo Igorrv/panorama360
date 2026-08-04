@@ -11,6 +11,7 @@ struct TourLinkSheet: View {
     @State private var target: TourScene?
     @State private var label = ""
     @State private var icon = "arrow.right.circle.fill"
+    @State private var info = ""
 
     private static let icons: [(String, String)] = [
         ("arrow.right.circle.fill", "Passagem"),
@@ -39,6 +40,13 @@ struct TourLinkSheet: View {
                     .background(Color.white.opacity(0.08),
                                 in: RoundedRectangle(cornerRadius: Theme.R.md))
                     .foregroundColor(.white)
+                TextField("Informação (opcional, ex.: 12m², reformada)", text: $info)
+                    .textFieldStyle(.plain)
+                    .padding(12)
+                    .background(Color.white.opacity(0.08),
+                                in: RoundedRectangle(cornerRadius: Theme.R.md))
+                    .foregroundColor(.white)
+                    .lineLimit(1...3)
             }
 
             Spacer(minLength: 0)
@@ -52,7 +60,8 @@ struct TourLinkSheet: View {
                     vm.commitHotspot(targetSceneID: t.id,
                                      label: label.trimmingCharacters(in: .whitespaces).isEmpty
                                             ? t.title : label,
-                                     icon: icon)
+                                     icon: icon,
+                                     info: info)
                 } label: {
                     Text("Criar link").frame(maxWidth: .infinity).padding(.vertical, 4)
                 }
@@ -108,6 +117,7 @@ struct TourLinkSheet: View {
     private func seed() {
         if target == nil { target = vm.otherScenes().first }
         label = vm.draftHotspot?.label ?? ""
+        info = vm.draftHotspot?.info ?? ""
         if let ic = vm.draftHotspot?.iconName { icon = ic }
     }
 }

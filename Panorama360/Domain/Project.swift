@@ -10,6 +10,12 @@ public struct Project: Codable, Sendable, Identifiable, Equatable {
     public var scenes: [TourScene]
     /// Scene to open first when playing the tour. Defaults to the first scene.
     public var startSceneID: UUID?
+    /// pt-BR broker/agency name shown in the tour, e.g. "Ana Souza — CRECI 12345".
+    public var brokerName: String?
+    /// pt-BR contact (phone/WhatsApp) for the listing owner.
+    public var brokerContact: String?
+    /// Brand accent as "#RRGGBB"; nil ⇒ app cyan. Drives the tour's tint.
+    public var accentHex: String?
     public let createdAt: Date
     public var updatedAt: Date
 
@@ -17,12 +23,18 @@ public struct Project: Codable, Sendable, Identifiable, Equatable {
                 title: String,
                 scenes: [TourScene] = [],
                 startSceneID: UUID? = nil,
+                brokerName: String? = nil,
+                brokerContact: String? = nil,
+                accentHex: String? = nil,
                 createdAt: Date = Date(),
                 updatedAt: Date = Date()) {
         self.id = id
         self.title = title
         self.scenes = scenes
         self.startSceneID = startSceneID
+        self.brokerName = brokerName
+        self.brokerContact = brokerContact
+        self.accentHex = accentHex
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

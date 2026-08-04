@@ -23,6 +23,15 @@ struct TourViewerView: View {
         _vm = StateObject(wrappedValue: TourViewerViewModel(projectID: projectID))
     }
 
+    /// Brand accent for this project (cyan when unset).
+    private var accent: Color { Theme.color(fromHex: vm.project?.accentHex) }
+    /// Non-empty broker name for the topBar; nil ⇒ line hidden.
+    private var brokerLine: String? {
+        vm.project?.brokerName?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .flatMap { $0.isEmpty ? nil : $0 }
+    }
+
     var body: some View {
         ZStack {
             Color.black.ignoresSafeArea()
@@ -76,7 +85,7 @@ struct TourViewerView: View {
                 .opacity(chromeVisible ? 1 : 0)
                 .animation(Theme.spring, value: chromeVisible)
         }
-        .tint(Theme.cyan)
+        .tint(accent)
         .onAppear { poke() }
         .onDisappear { hideTask?.cancel(); vm.engine.stopGyro(); vm.detach() }
         .sheet(isPresented: $vm.showLinkSheet) { TourLinkSheet(vm: vm) }
@@ -110,6 +119,12 @@ struct TourViewerView: View {
                     .font(.App.hud).foregroundColor(.white).lineLimit(1)
                 Text("\(vm.currentIndex + 1)/\(vm.project?.scenes.count ?? 0) · \(vm.currentScene?.title ?? "")")
                     .font(.App.micro).foregroundColor(.white.opacity(0.6)).lineLimit(1)
+                if let broker = brokerLine {
+                    Label(broker, systemImage: "person.crop.circle.fill")
+                        .font(.App.micro)
+                        .foregroundColor(accent.opacity(0.92))
+                        .lineLimit(1)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
@@ -119,6 +134,14 @@ struct TourViewerView: View {
                     .foregroundColor(gyroOn ? Theme.mint : .white)
                     .frame(width: 44, height: 44)
                     .glassPanel(cornerRadius: 22, tint: gyroOn ? Theme.mint : nil)
+            }
+
+            Button { toggleAutoPlay() } label: {
+                Image(systemName: vm.autoPlay ? "pause.circle.fill" : "play.circle.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(vm.autoPlay ? Theme.mint : .white)
+                    .frame(width: 44, height: 44)
+                    .glassPanel(cornerRadius: 22, tint: vm.autoPlay ? Theme.mint : nil)
             }
 
             Button { toggleEdit() } label: {
@@ -173,6 +196,17 @@ struct TourViewerView: View {
                     .frame(maxWidth: .infinity).padding(.vertical, 4)
             }
             .buttonStyle(HoloButton(gradient: Theme.auroraColors, cornerRadius: Theme.R.md))
+
+            Button {
+                Haptics.shared.aligned()
+                vm.autoLinkAllScenes()
+            } label: {
+                Label("Auto-conectar todas as cenas", systemImage: "link")
+                    .font(.system(size: 14, weight: .semibold, design: .rounded))
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity).padding(.vertical, 8)
+                    .glassPanel(cornerRadius: Theme.R.sm)
+            }
         }
         .padding(.horizontal, 16).padding(.vertical, 12)
         .glassPanel(cornerRadius: Theme.R.md, tint: Theme.mint)
@@ -212,9 +246,14 @@ struct TourViewerView: View {
         if gyroOn { vm.engine.startGyro() } else { vm.engine.stopGyro() }
     }
 
+    private func toggleAutoPlay() {
+        poke()
+        vm.setAutoPlay(!vm.autoPlay)
+    }
+
     private func toggleEdit() {
         vm.editMode.toggle()
-        if vm.editMode { gyroOn = false; vm.engine.stopGyro() }
+        if vm.editMode { gyroOn = false; vm.engine.stopGyro(); vm.setAutoPlay(false) }
         chromeVisible = true
         poke()
     }

@@ -15,18 +15,23 @@ public struct Hotspot: Codable, Sendable, Identifiable, Equatable {
     /// Placement yaw (radians) in the source panorama.
     public var yaw: Double
     public var targetSceneID: UUID
+    /// Optional pt-BR caption shown under the label (e.g. "12m², reformada").
+    /// Optional ⇒ old archives (no key) decode as nil.
+    public var info: String?
 
     public init(id: UUID = UUID(),
                 label: String,
                 iconName: String = "arrow.right.circle.fill",
                 pitch: Double,
                 yaw: Double,
-                targetSceneID: UUID) {
+                targetSceneID: UUID,
+                info: String? = nil) {
         self.id = id
         self.label = label
         self.iconName = iconName
         self.pitch = pitch
         self.yaw = yaw
         self.targetSceneID = targetSceneID
+        self.info = info
     }
 }

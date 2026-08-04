@@ -16,6 +16,19 @@ enum Theme {
     static let gold   = Color(red: 1.00, green: 0.78, blue: 0.25)
     static let ink    = Color(red: 0.03, green: 0.04, blue: 0.09)
 
+    // MARK: - Branding
+    /// Parses an optional "#RRGGBB"/"RRGGBB" hex into a `Color`. Returns
+    /// `fallback` (brand cyan) on nil/invalid, so a missing/old value always
+    /// degrades to the app identity instead of crashing a render.
+    static func color(fromHex hex: String?, fallback: Color = cyan) -> Color {
+        guard var hex else { return fallback }
+        if hex.hasPrefix("#") { hex.removeFirst() }
+        guard hex.count == 6, let v = UInt32(hex, radix: 16) else { return fallback }
+        return Color(red: Double((v >> 16) & 0xFF) / 255,
+                     green: Double((v >> 8) & 0xFF) / 255,
+                     blue: Double(v & 0xFF) / 255)
+    }
+
     // MARK: - Gradients
     static let auroraColors  = [cyan, violet]
     static let successColors = [mint, cyan]

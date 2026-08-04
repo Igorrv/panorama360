@@ -7,6 +7,7 @@ struct ProjectDetailView: View {
     let projectID: UUID
     @StateObject private var vm: ProjectDetailViewModel
     @EnvironmentObject private var router: AppRouter
+    @State private var showBranding = false
 
     init(projectID: UUID) {
         self.projectID = projectID
@@ -23,6 +24,8 @@ struct ProjectDetailView: View {
                     .padding(.top, 8)
                     .padding(.bottom, 12)
 
+                threeDCard
+
                 if let project = vm.project {
                     if project.scenes.isEmpty {
                         emptyState
@@ -38,6 +41,7 @@ struct ProjectDetailView: View {
         }
         .tint(Theme.cyan)
         .onAppear { vm.reload() }
+        .sheet(isPresented: $showBranding) { BrandingSheet(vm: vm) }
     }
 
     // MARK: - Header
@@ -61,6 +65,13 @@ struct ProjectDetailView: View {
                     .foregroundColor(.white.opacity(0.5))
             }
             Spacer()
+            Button { showBranding = true } label: {
+                Image(systemName: "paintbrush.fill")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundColor(Theme.color(fromHex: vm.project?.accentHex))
+                    .frame(width: 44, height: 44)
+                    .glassPanel(cornerRadius: 22)
+            }
             Button {
                 router.goTourViewer(projectID)
             } label: {
@@ -73,6 +84,57 @@ struct ProjectDetailView: View {
                                     cornerRadius: Theme.R.md))
             .disabled(!vm.canStartTour)
         }
+    }
+
+    // MARK: - 3D mesh
+
+    /// LiDAR 3D entry point. Gated to LiDAR devices; shows a "walk" affordance
+    /// once a scan is saved. Non-LiDAR devices see an info card pointing at the
+    /// 360° tour.
+    private var threeDCard: some View {
+        VStack(spacing: 10) {
+            if RoomScanner.isSupported {
+                Button { router.goRoomScan(projectID) } label: {
+                    cardRow(icon: "cube.transparent.fill",
+                            title: "Escanear em 3D",
+                            subtitle: "Mapeie o cômodo com LiDAR", tint: Theme.violet)
+                }
+                if vm.meshReady {
+                    Button { router.goMeshWalk(projectID) } label: {
+                        cardRow(icon: "figure.walk",
+                                title: "Caminhar no 3D",
+                                subtitle: "Percorra o modelo escaneado", tint: Theme.mint)
+                    }
+                }
+            } else {
+                cardRow(icon: "cube.transparent",
+                        title: "3D indisponível neste dispositivo",
+                        subtitle: "Requer iPhone Pro com LiDAR — use o tour 360°.",
+                        tint: .gray)
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.bottom, 8)
+    }
+
+    private func cardRow(icon: String, title: String, subtitle: String, tint: Color) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 22))
+                .foregroundColor(tint)
+                .frame(width: 46, height: 46)
+                .background(tint.opacity(0.15), in: RoundedRectangle(cornerRadius: Theme.R.sm))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 15, weight: .semibold)).foregroundColor(.white)
+                Text(subtitle).font(.App.micro).foregroundColor(.white.opacity(0.55))
+            }
+            Spacer()
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold)).foregroundColor(.white.opacity(0.4))
+        }
+        .padding(12)
+        .glassPanel(cornerRadius: Theme.R.md)
+        .contentShape(Rectangle())
     }
 
     // MARK: - Scene list

@@ -39,9 +39,17 @@ struct HotspotOverlay: View {
                 HStack(spacing: 7) {
                     Image(systemName: h.iconName)
                         .font(.system(size: 14, weight: .bold))
-                    Text(vm.targetTitle(for: h) ?? "Cena removida")
-                        .font(.App.caption)
-                        .lineLimit(1)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text(vm.targetTitle(for: h) ?? "Cena removida")
+                            .font(.App.caption)
+                            .lineLimit(1)
+                        if let info = h.info, !info.isEmpty {
+                            Text(info)
+                                .font(.App.micro)
+                                .foregroundColor(.white.opacity(0.72))
+                                .lineLimit(2)
+                        }
+                    }
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 12).padding(.vertical, 8)
