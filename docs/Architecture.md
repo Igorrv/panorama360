@@ -72,13 +72,27 @@ All knobs live on `CaptureGate` — tune without touching UI.
 `PanoramaEngine` (actor) serializes GPU/disk work:
 
 ```
-samples[] → Undistorter (Brown–Conrady, ultra-wide only; identity otherwise)
-         → ExposureCompensator
-         → MetalSphereProjector (warp + blend onto equirect)
+samples[] → HorizonLeveler (gravity → level horizon)
+         → PhotoGainSolver (global exposure + white balance)
+         → Undistorter (Brown–Conrady, ultra-wide only; identity otherwise)
+         → MetalSphereProjector (warp + accumulate two bands)
+         → BandBlender (low band from the wide band, detail from the sharp one)
+         → PoleFiller (dilate colour into uncovered gaps)
          → ImageWriter → session equirectangular URL
 ```
 
 Because ARKit recorded the **exact orientation** of each shot, warping is deterministic — no blind feature matching. Optional `OpenCVStitcher` swaps in via `#if canImport(opencv2)` (see [OpenCVIntegration.md](OpenCVIntegration.md)).
+
+### What each quality stage fixes
+
+| Stage | Artefact it removes | How |
+| --- | --- | --- |
+| `HorizonLeveler` | Horizon drawn as a sine wave | Averages the per-shot gravity vector to find true "up" in the reference frame, then pre-rotates every quaternion. Skipped when tilt is unmeasurable, < 0.3°, or > 30°. |
+| `PhotoGainSolver` | Patchwork brightness and colour cast | Projects every photo into a 128×64 equirect probe, so overlapping photos share pixel coordinates and their means are directly comparable. Solves all pairwise constraints (Gauss–Seidel on log gains, per channel) for one RGB gain per photo. |
+| `BandBlender` | Exposure steps *and* ghosting at seams | Two accumulations: a wide feather (smooth transitions) and a sharp, high-exponent weight (one photo wins each pixel). Result is `blur(wide) + (sharp − blur(sharp))`, blurred at 1/8 scale with longitude wrap. |
+| `PoleFiller` | Black holes at the poles | Morphological dilation, ping-ponging between the target and a single scratch texture. |
+
+`Options.adaptive()` sizes the output (up to 6144×3072) from `os_proc_available_memory()`; peak use is ~4 full-res RGBA16F textures, and each accumulator is released the moment it is normalised. Kill-switches: `PANORAMA_DISABLE_GAINSOLVE`, `PANORAMA_DISABLE_TWOBAND`, `PANORAMA_DISABLE_UNDISTORT`, `PANORAMA_POLEFILL_ITERS=0`.
 
 ## Viewer pipeline
 

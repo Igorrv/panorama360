@@ -20,8 +20,12 @@ public struct ProjectorUniforms {
     public var intrinsics: SIMD4<Float> = SIMD4<Float>(1, 1, 0, 0)   // fx, fy, cx, cy
     public var imageSize: SIMD2<Float> = .zero
     public var outputSize: SIMD2<Float> = .zero
-    public var exposureGain: Float = 1.0
-    public var feather: Float = 1.0
-    public var pad: SIMD2<Float> = .zero
+    /// rgb: per-channel exposure gain. w: blend weight exponent (1 = plain
+    /// cosine average, high = winner-takes-most for the detail band).
+    public var gain: SIMD4<Float> = SIMD4<Float>(1, 1, 1, 1)
+    public var feather: Float = 0.1
+    public var pad0: Float = 0
+    public var pad1: Float = 0
+    public var pad2: Float = 0
     public init() {}
 }

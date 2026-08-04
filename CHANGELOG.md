@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.2.0] — 2026-08-04
+
+### Added
+- `HorizonLeveler`: per-shot gravity is now recorded and used to level the horizon,
+  removing the tilt the reference shot baked into the whole panorama.
+- `PhotoGainSolver`: global per-channel gain compensation solved over equirectangular
+  probes, so overlapping photos agree in brightness *and* colour temperature.
+- `BandBlender`: two-band blending (wide feather for low frequencies, winner-takes-most
+  for detail) — seams stop showing without smearing texture into ghosts.
+- `MetalSphereProjector.Options.adaptive()`: output resolution up to 6144×3072 chosen
+  from the memory actually available.
+
+### Fixed
+- Exposure gain had no effect: it scaled the blend weight as well as the colour, so it
+  cancelled out in the normalisation pass.
+- `PoleFiller` used two full-resolution scratch textures where one suffices.
+
 ## [1.1.0] — 2026-07-13
 
 ### Added

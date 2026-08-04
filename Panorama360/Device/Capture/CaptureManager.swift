@@ -91,6 +91,7 @@ public actor CaptureManager {
             quaternion: orientation.quaternion,
             pitch: orientation.pitch,
             yaw: orientation.yaw,
+            gravity: orientation.gravity,
             exifOrientation: 1, // stored upright (portrait) — see CameraEngine
             timestamp: Date().timeIntervalSince1970
         )

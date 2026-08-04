@@ -75,7 +75,7 @@ extension ARSessionManager: ARSessionDelegate {
             yaw: yaw,
             roll: 0,
             rotationRate: rotationRate,
-            gravity: .zero,
+            gravity: OrientationResolver.gravity(transform: transform),
             timestamp: frame.timestamp
         )
         onUpdate?(orientation)

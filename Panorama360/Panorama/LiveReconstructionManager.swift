@@ -185,8 +185,8 @@ public actor LiveReconstructionManager {
                                            sample.intrinsics.cx, sample.intrinsics.cy)
         uniforms.imageSize = SIMD2<Float>(Float(sample.width), Float(sample.height))
         uniforms.outputSize = SIMD2<Float>(Float(outputSize.x), Float(outputSize.y))
-        uniforms.exposureGain = gain
-        uniforms.feather = 1.0
+        uniforms.gain = SIMD4<Float>(gain, gain, gain, 1)
+        uniforms.feather = 0.1
 
         encoder.setRenderPipelineState(accumulatePipeline)
         encoder.setFragmentTexture(photo, index: 0)

@@ -112,6 +112,7 @@ struct StitchingView: View {
         case .undistorting: return "camera.aperture"
         case .exposure:     return "sun.max"
         case .projecting:   return "globe"
+        case .blending:     return "square.stack.3d.up"
         case .finalizing:   return "sparkles"
         }
     }

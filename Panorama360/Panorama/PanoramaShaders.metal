@@ -78,17 +78,24 @@ fragment float4 accumulate_fragment(VertexOut in [[stage_in]],
     float2 tex = float2(u / size.x, v / size.y);
     float4 color = photo.sample(samp, tex);
 
-    // Weight: cosine foreshortening (falls off toward the lens edge) with a soft
-    // feather, times exposure gain. A zero alpha photo pixel contributes nothing.
+    // Weight: cosine foreshortening (falls off toward the lens edge) times a
+    // feather that fades the last `fw` of the frame so photos cross-fade.
     float3 n = normalize(dCam);
     float cosine = saturate(-n.z);
-    // Feather close to the image border so photos cross-fade.
-    float edgeU = 1.0 - smoothstep(0.45, 0.5, fabs(tex.x - 0.5));
-    float edgeV = 1.0 - smoothstep(0.45, 0.5, fabs(tex.y - 0.5));
-    float feather = mix(1.0, edgeU * edgeV, uni.feather);
-    float weight = cosine * feather * uni.exposureGain;
+    float fw = clamp(uni.feather * 0.5, 0.002, 0.24);
+    float edgeU = 1.0 - smoothstep(0.5 - fw, 0.5, fabs(tex.x - 0.5));
+    float edgeV = 1.0 - smoothstep(0.5 - fw, 0.5, fabs(tex.y - 0.5));
+    float w = cosine * edgeU * edgeV;
+    if (w <= 0.0) discard_fragment();
 
-    return float4(color.rgb * weight, weight);
+    // Exponent > 1 concentrates the weight on the photo that sees this
+    // direction most head-on: the detail band then keeps one photo's texture
+    // instead of averaging misaligned ones into a ghost.
+    float weight = pow(w, uni.gain.w);
+
+    // The gain scales the colour only — scaling the weight as well would
+    // cancel out in `divide_fragment` and correct nothing.
+    return float4(color.rgb * uni.gain.rgb * weight, weight);
 }
 
 // MARK: - Divide fragment (weighted average → final equirectangular)

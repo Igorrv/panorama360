@@ -15,8 +15,9 @@ public final class PoleFiller {
     private let device: MTLDevice
     private let commandQueue: MTLCommandQueue
     private let pipeline: MTLRenderPipelineState
-    private let scratchA: MTLTexture
-    private let scratchB: MTLTexture
+    /// Single scratch buffer: the passes ping-pong between it and the target,
+    /// which halves the memory this pass needs at full panorama resolution.
+    private let scratch: MTLTexture
 
     public init(device: MTLDevice, commandQueue: MTLCommandQueue,
                 width: Int, height: Int) throws {
@@ -37,8 +38,7 @@ public final class PoleFiller {
             Log.stitch.error("PoleFill pipeline error: \(error.localizedDescription, privacy: .public)")
             throw StitchError.renderFailed
         }
-        scratchA = try Self.makeTexture(device: device, width: width, height: height)
-        scratchB = try Self.makeTexture(device: device, width: width, height: height)
+        scratch = try Self.makeTexture(device: device, width: width, height: height)
     }
 
     /// Fills alpha==0 gaps in `target` **in place**. No-op when disabled or when
@@ -46,20 +46,21 @@ public final class PoleFiller {
     public func fill(_ target: MTLTexture) {
         let iterations = Self.iterations
         guard iterations > 0,
-              target.width == scratchA.width, target.height == scratchA.height else { return }
+              target.width == scratch.width, target.height == scratch.height else { return }
 
         guard let buffer = commandQueue.makeCommandBuffer() else { return }
         var source: MTLTexture = target
-        var dest: MTLTexture = scratchA
         for i in 0..<iterations {
             // Doubling step: pass i reaches 2^i px beyond the covered boundary
             // (cumulative ~63px over 6 passes), capped to avoid giant colour bleeds.
             let step = min(1 << i, 64)
+            let dest: MTLTexture = (source === target) ? scratch : target
             dilate(src: source, into: dest, step: step, buffer: buffer)
             source = dest
-            dest = (dest === scratchA) ? scratchB : scratchA
         }
-        blit(from: source, to: target, buffer: buffer)
+        if source !== target {
+            blit(from: source, to: target, buffer: buffer)
+        }
         buffer.commit()
         buffer.waitUntilCompleted()
     }

@@ -24,9 +24,10 @@ public actor PanoramaEngine {
         self.store = store
     }
 
-    /// Convenience builder using the default Metal projector.
+    /// Convenience builder using the default Metal projector, sized to whatever
+    /// this device can stitch without running out of memory.
     public static func `default`(store: SessionStore,
-                                 options: MetalSphereProjector.Options = .init()) throws -> PanoramaEngine {
+                                 options: MetalSphereProjector.Options = .adaptive()) throws -> PanoramaEngine {
         let projector = try MetalSphereProjector(options: options)
         return PanoramaEngine(stitcher: projector, store: store)
     }

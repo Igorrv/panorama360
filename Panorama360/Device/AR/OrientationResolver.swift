@@ -23,6 +23,15 @@ public enum OrientationResolver {
         relative.act(DeviceOrientation.backCameraAxis)
     }
 
+    /// Gravity expressed in the device frame, derived from the ARKit camera
+    /// pose. Valid because the session runs with `worldAlignment = .gravity`,
+    /// so world −Y always points down.
+    public static func gravity(transform: simd_float4x4) -> SIMD3<Double> {
+        let camQ = simd_quatf(transform)
+        let g = simd_inverse(camQ).act(SIMD3<Float>(0, -1, 0))
+        return SIMD3<Double>(Double(g.x), Double(g.y), Double(g.z))
+    }
+
     /// Angular velocity (rad/s) from two consecutive relative quaternions.
     public static func angularVelocity(from previous: simd_quatf,
                                        to current: simd_quatf,

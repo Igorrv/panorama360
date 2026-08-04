@@ -6,6 +6,7 @@ public enum StitchStage: String, Sendable, CaseIterable {
     case undistorting = "Corrigindo lente"
     case exposure     = "Equalizando exposição"
     case projecting   = "Projetando na esfera"
+    case blending     = "Fundindo as costuras"
     case finalizing   = "Finalizando"
 
     public var order: Int {

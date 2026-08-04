@@ -54,6 +54,11 @@ public struct CaptureSample: Identifiable, Codable, Sendable {
     public let pitch: Double
     public let yaw: Double
 
+    /// Gravity direction in the **device** frame at capture, normalised.
+    /// All-zero means it was not recorded (old archives / ARKit path before
+    /// gravity plumbing), which disables horizon levelling for the session.
+    public let gx, gy, gz: Float
+
     /// EXIF orientation of the stored HEIC (see CGImagePropertyOrientation).
     public let exifOrientation: Int
     public let timestamp: Double
@@ -64,6 +69,7 @@ public struct CaptureSample: Identifiable, Codable, Sendable {
                 intrinsics: CameraIntrinsics,
                 quaternion: simd_quatf,
                 pitch: Double, yaw: Double,
+                gravity: SIMD3<Double> = .zero,
                 exifOrientation: Int,
                 timestamp: Double) {
         self.id = id
@@ -77,12 +83,47 @@ public struct CaptureSample: Identifiable, Codable, Sendable {
         self.qw = quaternion.vector.w
         self.pitch = pitch
         self.yaw = yaw
+        self.gx = Float(gravity.x)
+        self.gy = Float(gravity.y)
+        self.gz = Float(gravity.z)
         self.exifOrientation = exifOrientation
         self.timestamp = timestamp
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, imageURL, width, height, intrinsics
+        case qx, qy, qz, qw, pitch, yaw, gx, gy, gz
+        case exifOrientation, timestamp
+    }
+
+    /// Custom decode so archives written before the gravity fields still load.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        imageURL = try c.decode(URL.self, forKey: .imageURL)
+        width = try c.decode(Int.self, forKey: .width)
+        height = try c.decode(Int.self, forKey: .height)
+        intrinsics = try c.decode(CameraIntrinsics.self, forKey: .intrinsics)
+        qx = try c.decode(Float.self, forKey: .qx)
+        qy = try c.decode(Float.self, forKey: .qy)
+        qz = try c.decode(Float.self, forKey: .qz)
+        qw = try c.decode(Float.self, forKey: .qw)
+        pitch = try c.decode(Double.self, forKey: .pitch)
+        yaw = try c.decode(Double.self, forKey: .yaw)
+        gx = try c.decodeIfPresent(Float.self, forKey: .gx) ?? 0
+        gy = try c.decodeIfPresent(Float.self, forKey: .gy) ?? 0
+        gz = try c.decodeIfPresent(Float.self, forKey: .gz) ?? 0
+        exifOrientation = try c.decode(Int.self, forKey: .exifOrientation)
+        timestamp = try c.decode(Double.self, forKey: .timestamp)
     }
 
     /// Reconstruct the relative rotation quaternion for the stitcher.
     public var quaternion: simd_quatf {
         simd_quatf(ix: qx, iy: qy, iz: qz, r: qw)
+    }
+
+    /// Gravity in the device frame (zero when unavailable).
+    public var gravity: SIMD3<Float> {
+        SIMD3<Float>(gx, gy, gz)
     }
 }
