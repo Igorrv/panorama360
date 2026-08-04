@@ -251,7 +251,11 @@ public final class TourViewerViewModel: ObservableObject {
               let sceneIdx = project.scenes.firstIndex(where: { $0.id == currentScene?.id }) else { return }
         draft.label = label; draft.iconName = icon
         draft.targetSceneID = targetSceneID
-        draft.info = info?.trimmingCharacters(in: .whitespacesAndNewlines).flatMap { $0.isEmpty ? nil : $0 }
+        if let t = info?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty {
+            draft.info = t
+        } else {
+            draft.info = nil
+        }
         project.scenes[sceneIdx].hotspots.append(draft)
         project.updatedAt = Date()
         try? store.persist(project)

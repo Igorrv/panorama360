@@ -102,7 +102,7 @@ public final class MeshTexturizer {
             let id = mesh.identifier
             // Skip anchors that have barely moved since last sample (cost bound).
             if let prev = lastTransform[id] {
-                let dt = simd_distance(prev.columns.3.xyz, mesh.transform.columns.3.xyz)
+                let dt = simd_distance(simd_xyz(prev.columns.3), simd_xyz(mesh.transform.columns.3))
                 if dt < moveEpsilon { continue }
             }
             lastTransform[id] = mesh.transform
@@ -118,8 +118,8 @@ public final class MeshTexturizer {
             let T = mesh.transform   // anchor-local → world
             for i in 0..<vc {
                 let lp = SIMD3<Float>(verts[i * 3], verts[i * 3 + 1], verts[i * 3 + 2])
-                let wp = (T * SIMD4<Float>(lp, 1)).xyz
-                let cp = (view * SIMD4<Float>(wp, 1)).xyz
+                let wp = simd_xyz(T * SIMD4<Float>(lp, 1))
+                let cp = simd_xyz(view * SIMD4<Float>(wp, 1))
                 let d = -cp.z                      // depth along camera forward (m, >0 in front)
                 guard d > 0.1, d < 12 else { continue }
 
@@ -153,7 +153,7 @@ public final class MeshTexturizer {
 
     // MARK: - Geometry source reader (mirrors RoomScanner's Metal pointer read)
 
-    private func readVertices(_ s: ARMeshAnchor.Geometry.Source) -> [Float] {
+    private func readVertices(_ s: ARGeometrySource) -> [Float] {
         let n = s.count
         guard n > 0, s.componentsPerVector == 3 else { return [] }
         let base = s.buffer.contents().advanced(by: s.offset)
@@ -212,8 +212,12 @@ private struct YUVPlanes {
         fullRange = (fmt == kCVPixelFormatType_420YpCbCr8BiPlanarFullRange)
         yStride = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 0)
         cbcrStride = CVPixelBufferGetBytesPerRowOfPlane(pixelBuffer, 1)
-        yBase = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 0)?.assumingMemoryBound(to: UInt8.self)
-        cbcrBase = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 1)?.assumingMemoryBound(to: UInt8.self)
+        if let yPtr = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 0) {
+            yBase = yPtr.assumingMemoryBound(to: UInt8.self)
+        } else { yBase = nil }
+        if let cPtr = CVPixelBufferGetBaseAddressOfPlane(pixelBuffer, 1) {
+            cbcrBase = cPtr.assumingMemoryBound(to: UInt8.self)
+        } else { cbcrBase = nil }
     }
 
     /// Nearest-neighbour YCbCr → linear RGB (BT.601), returns 0…1.
@@ -254,7 +258,9 @@ private struct DepthMap {
         width = CVPixelBufferGetWidth(pb)
         height = CVPixelBufferGetHeight(pb)
         stride = CVPixelBufferGetBytesPerRow(pb) / MemoryLayout<Float>.stride
-        base = CVPixelBufferGetBaseAddress(pb)?.assumingMemoryBound(to: Float.self)
+        if let ptr = CVPixelBufferGetBaseAddress(pb) {
+            base = ptr.assumingMemoryBound(to: Float.self)
+        } else { base = nil }
         // Depth map is lower-res than the captured image but is aligned to it.
         sx = Float(width) / Float(max(1, imgWidth))
         sy = Float(height) / Float(max(1, imgHeight))

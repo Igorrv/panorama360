@@ -20,14 +20,14 @@ public final class RoomScanner {
     public var anchorCount: Int { anchors.count }
 
     public static var isSupported: Bool {
-        ARWorldTrackingConfiguration.supportsSceneReconstruction(.meshing)
+        ARWorldTrackingConfiguration.supportsSceneReconstruction(.mesh)
     }
 
     /// Configuration with scene reconstruction (meshing). Nil on non-LiDAR.
     public static func makeConfiguration() -> ARWorldTrackingConfiguration? {
         guard isSupported else { return nil }
         let config = ARWorldTrackingConfiguration()
-        config.sceneReconstruction = .meshing
+        config.sceneReconstruction = .mesh
         config.worldAlignment = .gravity
         config.planeDetection = []
         // Per-frame depth map (LiDAR) — used by `MeshTexturizer` for occlusion
@@ -64,7 +64,7 @@ public final class RoomScanner {
         var parts: [(part: MeshPart, transform: simd_float4x4, id: UUID)] = []
         var totalFaces = 0
         for anchor in anchors.values {
-            guard let part = extract(anchor) else { continue }
+            guard let part = Self.extract(anchor) else { continue }
             parts.append((part, anchor.transform, anchor.identifier))
             totalFaces += part.faces.count / 3
         }
@@ -81,12 +81,12 @@ public final class RoomScanner {
             let part = item.part
             let t = item.transform
             let id = item.id
-            let rot = simd_float3x3(columns: (t.columns.0.xyz, t.columns.1.xyz, t.columns.2.xyz))
+            let rot = simd_float3x3(columns: (simd_xyz(t.columns.0), simd_xyz(t.columns.1), simd_xyz(t.columns.2)))
             let vc = part.positions.count / 3
             positions.reserveCapacity(positions.count + vc * 3)
             for i in 0..<vc {
                 let p = SIMD3<Float>(part.positions[i * 3], part.positions[i * 3 + 1], part.positions[i * 3 + 2])
-                let wp = (t * SIMD4<Float>(p, 1)).xyz
+                let wp = simd_xyz(t * SIMD4<Float>(p, 1))
                 positions.append(wp.x); positions.append(wp.y); positions.append(wp.z)
             }
             if part.normals.count == part.positions.count {
@@ -133,8 +133,8 @@ public final class RoomScanner {
         let faces: [UInt32]
     }
 
-    private typealias GeoSource = ARMeshAnchor.Geometry.Source
-    private typealias GeoElement = ARMeshAnchor.Geometry.Element
+    private typealias GeoSource = ARGeometrySource
+    private typealias GeoElement = ARGeometryElement
 
     private static func extract(_ anchor: ARMeshAnchor) -> MeshPart? {
         let g = anchor.geometry

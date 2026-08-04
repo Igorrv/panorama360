@@ -27,9 +27,9 @@ struct TourViewerView: View {
     private var accent: Color { Theme.color(fromHex: vm.project?.accentHex) }
     /// Non-empty broker name for the topBar; nil ⇒ line hidden.
     private var brokerLine: String? {
-        vm.project?.brokerName?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .flatMap { $0.isEmpty ? nil : $0 }
+        guard let t = vm.project?.brokerName?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !t.isEmpty else { return nil }
+        return t
     }
 
     var body: some View {

@@ -119,7 +119,7 @@ struct RoomScanView: View {
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.white.opacity(0.15))
                     Capsule().fill(coverageColor)
-                        .frame(width: max(0, geo.size.width * vm.coverage))
+                        .frame(width: max(0, geo.size.width * CGFloat(vm.coverage)))
                 }
             }
             .frame(height: 8)

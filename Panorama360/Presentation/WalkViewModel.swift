@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import UIKit
 import RealityKit
 import ARKit
 import Combine
@@ -79,32 +80,24 @@ public final class WalkViewModel: ObservableObject {
             status = ""
             return
         }
-        // Vertex colours carry the captured photo: unlit keeps them faithful
-        // (no harsh grey shading). Legacy uncoloured meshes keep the lit fallback.
-        let material: Material
-        if mesh.colors.isEmpty {
-            var lit = SimpleMaterial()
-            lit.color = .init(tint: UIColor(white: 0.82, alpha: 1.0), texture: nil)
-            lit.metallic = .init(floatLiteral: 0.0)
-            lit.roughness = .init(floatLiteral: 0.55)
-            material = lit
-        } else {
-            material = UnlitMaterial(color: .white)
-        }
-        let entity = ModelEntity(mesh: resource, materials: [material])
+        // iOS 16 MeshDescriptor has no vertex-colour buffer — use lit grey for now.
+        // (Colours are still stored on RoomMesh for a future Metal/iOS 18 path.)
+        var lit = SimpleMaterial()
+        lit.color = .init(tint: UIColor(white: 0.82, alpha: 1.0), texture: nil)
+        lit.metallic = .init(floatLiteral: 0.0)
+        lit.roughness = .init(floatLiteral: 0.55)
+        let entity = ModelEntity(mesh: resource, materials: [lit])
 
         let anchor = AnchorEntity(world: matrix_identity_float4x4)
         addLights(to: anchor)
         anchor.addChild(entity)
         arView.scene.addAnchor(anchor)
 
-        // Virtual camera.
+        // Virtual camera (PerspectiveCamera is itself an Entity).
         let camAnchor = AnchorEntity(world: matrix_identity_float4x4)
-        let camEntity = Entity()
-        var cam = PerspectiveCamera()
-        cam.camera.far = 100
-        cam.camera.near = 0.02
-        camEntity.components.set(cam)
+        let camEntity = PerspectiveCamera()
+        camEntity.camera.far = 100
+        camEntity.camera.near = 0.02
         camAnchor.addChild(camEntity)
         arView.scene.addAnchor(camAnchor)
         cameraEntity = camEntity
@@ -123,25 +116,8 @@ public final class WalkViewModel: ObservableObject {
         if !mesh.normals.isEmpty {
             desc.normals = MeshBuffers.Normals(unflatten(mesh.normals))
         }
-        if !mesh.colors.isEmpty {
-            desc.colors = MeshBuffers.Colors(unflattenColors(mesh.colors))
-        }
+        // Vertex colours require iOS 18+ MeshBuffers.Color — omitted on iOS 16.
         return try? MeshResource.generate(from: [desc])
-    }
-
-    /// RGBA8 (4/vertex) → normalized `[SIMD4<Float>]` for `MeshDescriptor.colors`.
-    private func unflattenColors(_ flat: [UInt8]) -> [SIMD4<Float>] {
-        let n = flat.count / 4
-        var out = [SIMD4<Float>](repeating: .one, count: n)
-        for i in 0..<n {
-            out[i] = SIMD4<Float>(
-                Float(flat[i * 4]) / 255,
-                Float(flat[i * 4 + 1]) / 255,
-                Float(flat[i * 4 + 2]) / 255,
-                Float(flat[i * 4 + 3]) / 255
-            )
-        }
-        return out
     }
 
     private func unflatten(_ flat: [Float]) -> [SIMD3<Float>] {
@@ -174,31 +150,40 @@ public final class WalkViewModel: ObservableObject {
 
     private func tick() {
         if move.dx != 0 || move.dy != 0 {
-            let fwd = horizontalForward()                          // yaw-only, stays planar
-            let right = simd_cross(fwd, SIMD3<Float>(0, 1, 0))     // unit (fwd is horizontal)
-            let delta = right * (move.dx * Self.speed * Self.dt) + fwd * (move.dy * Self.speed * Self.dt)
-            let r = Self.playerRadius
-            if collider == nil {
-                position += delta
-            } else if !collider!.isBlocked(from: position, to: position + delta, radius: r) {
-                position += delta
-            } else {
-                // Blocked diagonally — slide along the wall by axes.
-                let xOnly = SIMD3<Float>(position.x + delta.x, position.y, position.z)
-                if !collider!.isBlocked(from: position, to: xOnly, radius: r) {
-                    position.x = xOnly.x
-                }
-                let zOnly = SIMD3<Float>(position.x, position.y, position.z + delta.z)
-                if !collider!.isBlocked(from: position, to: zOnly, radius: r) {
-                    position.z = zOnly.z
-                }
-            }
+            applyMove()
         }
         // Gravity: follow the floor directly beneath the camera (head height).
-        if let collider, let fy = collider.floorHeight(x: position.x, z: position.z, fromY: position.y + 0.5) {
+        if let collider,
+           let fy = collider.floorHeight(x: position.x, z: position.z, fromY: position.y + 0.5) {
             position.y = fy + Self.eyeHeight
         }
         applyCamera()
+    }
+
+    private func applyMove() {
+        let fwd = horizontalForward()
+        let right = simd_cross(fwd, SIMD3<Float>(0, 1, 0))
+        let scale = Self.speed * Self.dt
+        let delta = right * (Float(move.dx) * scale) + fwd * (Float(move.dy) * scale)
+        let r = Self.playerRadius
+        guard let collider else {
+            position += delta
+            return
+        }
+        let dest = position + delta
+        if !collider.isBlocked(from: position, to: dest, radius: r) {
+            position = dest
+            return
+        }
+        // Blocked diagonally — slide along the wall by axes.
+        let xOnly = SIMD3<Float>(position.x + delta.x, position.y, position.z)
+        if !collider.isBlocked(from: position, to: xOnly, radius: r) {
+            position.x = xOnly.x
+        }
+        let zOnly = SIMD3<Float>(position.x, position.y, position.z + delta.z)
+        if !collider.isBlocked(from: position, to: zOnly, radius: r) {
+            position.z = zOnly.z
+        }
     }
 
     /// Horizontal look direction from yaw only — looking up/down must not fly you.

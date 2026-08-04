@@ -67,6 +67,7 @@ public final class ProjectDetailViewModel: ObservableObject {
 
     /// Trims whitespace and returns nil for empty strings (keeps archives tidy).
     private func clean(_ text: String?) -> String? {
-        text?.trimmingCharacters(in: .whitespacesAndNewlines).flatMap { $0.isEmpty ? nil : $0 }
+        guard let t = text?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty else { return nil }
+        return t
     }
 }

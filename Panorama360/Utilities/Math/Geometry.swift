@@ -233,3 +233,9 @@ public extension FloatingPoint {
         min(max(self, range.lowerBound), range.upperBound)
     }
 }
+
+/// Swift SIMD has no `.xyz` swizzle — keep call sites readable.
+@inlinable
+public func simd_xyz(_ v: SIMD4<Float>) -> SIMD3<Float> {
+    SIMD3<Float>(v.x, v.y, v.z)
+}
