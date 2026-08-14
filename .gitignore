@@ -27,4 +27,5 @@ AuthKey_*.p8
 
 # Local agent / IDE.
 .claude/
+graphify-out/
 
