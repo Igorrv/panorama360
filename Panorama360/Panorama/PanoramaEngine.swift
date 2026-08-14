@@ -40,11 +40,20 @@ public actor PanoramaEngine {
         running = true
         defer { running = false }
 
-        let url = store.equirectangularURL(for: session.id)
+        let url = store.stitchOutputURL(for: session.id)
         Log.stitch.info("Stitching \(session.samples.count) photos → \(url.lastPathComponent, privacy: .public)")
         let result = try await stitcher.stitch(samples: session.samples,
                                                into: url,
                                                onProgress: onProgress)
+        var completedSession = session
+        completedSession.equirectangularURL = result
+        do {
+            try store.persist(completedSession)
+        } catch {
+            // The panorama itself is already durable and can still be opened.
+            // Keep the successful stitch, but leave a diagnostic for recovery.
+            Log.storage.warning("Could not persist stitched session: \(error.localizedDescription, privacy: .public)")
+        }
         Log.stitch.info("Stitching complete → \(result.lastPathComponent, privacy: .public)")
         return result
     }

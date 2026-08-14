@@ -45,8 +45,11 @@ public final class MotionEngine {
 
     public func stop() {
         manager.stopDeviceMotionUpdates()
-        reference = nil
-        referencePrimed = false
+        // The session reference is intentionally PRESERVED here. Clearing it
+        // would force the next update to re-anchor the heading origin, so photos
+        // captured across a stop/start (e.g. a suspend/resume) would end up in
+        // two different frames and misalign in the stitch. The reference is
+        // scoped to this instance's lifetime — a new session builds a new engine.
     }
 
     // MARK: - Processing

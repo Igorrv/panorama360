@@ -151,9 +151,13 @@ public final class AppRouter: ObservableObject {
                               title: "Cena \(project.scenes.count + 1)")
         project.scenes.append(scene)
         if project.startSceneID == nil { project.startSceneID = scene.id }
-        project.updatedAt = Date()
+        // Auto-link neighbours so a multi-scene tour is navigable the moment it
+        // opens — no manual edit-mode pass required (idempotent; safe to re-run).
+        project = AutoLinker.autoLink(project)
         try? projects.persist(project)
         captureContext = nil
-        goProjectDetail(pid)
+        // Land straight in the 360° tour so the user sees the result immediately
+        // — the tour's back button returns to this project's detail.
+        goTourViewer(pid)
     }
 }

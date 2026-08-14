@@ -4,7 +4,7 @@ import Foundation
 /// avoid shadowing `SwiftUI.Scene` / `SCNScene`.
 ///
 /// The equirectangular image is **never copied or stored here** — only the
-/// source `sessionID` is kept, and the finished panorama (`panorama.heic`) is
+/// source `sessionID` is kept, and the finished panorama (`panorama.jpg`) is
 /// resolved on demand via `ProjectStore.equirectURL(for:)`. Deleting a scene
 /// therefore leaves the underlying `PanoramaSession` intact (no data loss).
 public struct TourScene: Codable, Sendable, Identifiable, Equatable {

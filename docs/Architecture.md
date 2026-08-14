@@ -92,6 +92,20 @@ Because ARKit recorded the **exact orientation** of each shot, warping is determ
 | `BandBlender` | Exposure steps *and* ghosting at seams | Two accumulations: a wide feather (smooth transitions) and a sharp, high-exponent weight (one photo wins each pixel). Result is `blur(wide) + (sharp − blur(sharp))`, blurred at 1/8 scale with longitude wrap. |
 | `PoleFiller` | Black holes at the poles | Morphological dilation, ping-ponging between the target and a single scratch texture. |
 
+### Two conventions the whole pipeline depends on
+
+**Geometry.** Photos are stored upright portrait with the rotation baked into the
+pixels (`ImageWriter.upright`), never left in EXIF — the projector reads raw pixels.
+`AVCaptureDevice.Format.videoFieldOfView` measures the sensor's **long** axis, which
+is the stored image's *height*; the focal length must come from the long side, and
+the guide overlay needs `CameraEngine.photoFOV.horizontal` (the portrait/screen one).
+
+**Colour.** Everything blends in **linear light**: photo textures are loaded with
+`.SRGB: true` so sampling delinearises, accumulation happens in `rgba16Float`, and the
+encode back to sRGB happens only at the edges — `CIImage(mtlTexture:)` tagged
+`linearSRGB` on write, and `.bgra8Unorm_srgb` drawables in the viewers. Getting either
+edge wrong shows up as a panorama that is uniformly too dark or too bright.
+
 `Options.adaptive()` sizes the output (up to 6144×3072) from `os_proc_available_memory()`; peak use is ~4 full-res RGBA16F textures, and each accumulator is released the moment it is normalised. Kill-switches: `PANORAMA_DISABLE_GAINSOLVE`, `PANORAMA_DISABLE_TWOBAND`, `PANORAMA_DISABLE_UNDISTORT`, `PANORAMA_POLEFILL_ITERS=0`.
 
 ## Viewer pipeline

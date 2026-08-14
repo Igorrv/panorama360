@@ -44,7 +44,7 @@ public final class SpatialFragmentRenderer: NSObject, MTKViewDelegate {
         let desc = MTLRenderPipelineDescriptor()
         desc.vertexFunction = vertex
         desc.fragmentFunction = fragment
-        desc.colorAttachments[0].pixelFormat = .bgra8Unorm
+        desc.colorAttachments[0].pixelFormat = .bgra8Unorm_srgb   // must match LiveMeshPreview's view
         let pipeline: MTLRenderPipelineState
         do {
             pipeline = try device.makeRenderPipelineState(descriptor: desc)

@@ -48,8 +48,12 @@ public final class CameraEngine: NSObject {
     /// Fired when the session reports a runtime error (hardware reset, etc.).
     public var onRuntimeError: ((String) -> Void)?
     public private(set) var lastRuntimeError: String?
-    /// Latest captured image buffer (for the live-preview/blur gate).
-    public private(set) var latestPixelBuffer: CVPixelBuffer?
+
+    /// Sharpness is sampled on a timer rather than every frame: the gate only
+    /// reads it at 15 Hz, and a Laplacian over a full preview frame at 30–60 fps
+    /// is pure heat. Touched only on `videoQueue`.
+    private var lastSharpnessTime: CFTimeInterval = 0
+    private static let sharpnessInterval: CFTimeInterval = 1.0 / 12
 
     public override init() {
         previewLayer = AVCaptureVideoPreviewLayer()
@@ -104,6 +108,8 @@ public final class CameraEngine: NSObject {
                 do {
                     if !self.configured { try self.configure(); self.configured = true }
                     if !self.session.isRunning { self.session.startRunning() }
+                    // Only valid once the preset has settled on an active format.
+                    self.applyMaxPhotoDimensions()
                     continuation.resume()
                 } catch {
                     continuation.resume(throwing: error)
@@ -128,6 +134,12 @@ public final class CameraEngine: NSObject {
         // Clean any prior wiring (safe if configure is ever re-run).
         for input in session.inputs { session.removeInput(input) }
         for output in session.outputs { session.removeOutput(output) }
+
+        // Stills, not video. Without this the session defaults to `.high`, which
+        // activates a 16:9 video format: the photos come back cropped top and
+        // bottom (fewer degrees per shot ⇒ holes in the sphere) and below the
+        // sensor's full resolution.
+        if session.canSetSessionPreset(.photo) { session.sessionPreset = .photo }
 
         // Prefer the ultra-wide (0.5x, "grande angular", ~120° FOV) so each shot
         // covers far more of the sphere and every guide point is reachable while
@@ -238,8 +250,28 @@ public final class CameraEngine: NSObject {
         }
         settings.flashMode = .off
         settings.photoQualityPrioritization = .quality
+        settings.maxPhotoDimensions = output.maxPhotoDimensions
         return settings
     }
+
+    /// Raises the photo output to the largest resolution the active format
+    /// offers, capped so a 48 MP sensor cannot hand the stitcher buffers it
+    /// will be jetsam-killed for. Must run inside a configuration transaction.
+    private func applyMaxPhotoDimensions() {
+        guard let photoOutput, let device = videoDevice else { return }
+        let affordable = device.activeFormat.supportedMaxPhotoDimensions.filter {
+            Int($0.width) * Int($0.height) <= Self.maxPhotoPixels
+        }
+        guard let best = affordable.max(by: {
+            Int($0.width) * Int($0.height) < Int($1.width) * Int($1.height)
+        }) else { return }
+        session.beginConfiguration()
+        photoOutput.maxPhotoDimensions = best
+        session.commitConfiguration()
+        Log.camera.info("Photo dimensions \(best.width, privacy: .public)×\(best.height, privacy: .public)")
+    }
+
+    private static let maxPhotoPixels = 16_000_000
 
     // MARK: - Status & intrinsics
 
@@ -247,32 +279,68 @@ public final class CameraEngine: NSObject {
         CameraStatus.current(from: videoDevice)
     }
 
-    /// Approximate pinhole intrinsics for the captured photo, derived from the
-    /// device's horizontal field of view. Square pixels and a centred principal
-    /// point are assumed — adequate for the projection-based stitcher.
+    /// Field of view of a photo as it is **stored** (upright portrait), radians.
+    /// `AVCaptureDevice.Format.videoFieldOfView` describes the sensor's *long*
+    /// axis, which portrait rotation turns into the image height — so the two
+    /// are not interchangeable and confusing them skews every projection.
+    public struct PhotoFOV: Sendable {
+        /// Across the image width — what the screen shows left-to-right.
+        public let horizontal: Double
+        /// Across the image height — equals the sensor's quoted field of view.
+        public let vertical: Double
+        /// Half of the narrower axis: the radius a single shot really covers.
+        public var narrowHalf: Double { min(horizontal, vertical) / 2 }
+    }
+
+    /// FOV of the current lens/format, or nil before the session is configured.
+    public var photoFOV: PhotoFOV? {
+        guard let device = videoDevice else { return nil }
+        let format = device.activeFormat
+        let sensorFOV = Double(format.videoFieldOfView) * .pi / 180
+        guard sensorFOV > 0 else { return nil }
+        let dims = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+        let long = Double(max(dims.width, dims.height))
+        let short = Double(min(dims.width, dims.height))
+        guard long > 0, short > 0 else { return nil }
+        return PhotoFOV(horizontal: 2 * atan(tan(sensorFOV / 2) * (short / long)),
+                        vertical: sensorFOV)
+    }
+
+    /// Approximate pinhole intrinsics for the captured photo. Square pixels and
+    /// a centred principal point are assumed — adequate for the projection-based
+    /// stitcher.
+    ///
+    /// The focal length is derived from the photo's **long side**, because that
+    /// is the axis `videoFieldOfView` measures. Deriving it from the portrait
+    /// width instead (as this did) left every focal length ~33% short on a 4:3
+    /// sensor, so each photo was projected onto far more of the sphere than it
+    /// actually covered and neighbouring shots could never line up.
     public func intrinsics(forPhotoWidth width: Int, height: Int) -> CameraIntrinsics {
-        guard let device = videoDevice,
-              let format = device.activeFormat as AVCaptureDevice.Format? else {
-            return CameraIntrinsics(fx: Float(width), fy: Float(width),
-                                    cx: Float(width) / 2, cy: Float(height) / 2)
+        let longSide = Double(max(width, height))
+        let cx = Float(width) / 2, cy = Float(height) / 2
+        guard let device = videoDevice else {
+            return CameraIntrinsics(fx: Float(longSide), fy: Float(longSide), cx: cx, cy: cy)
         }
-        let hfov = Double(format.videoFieldOfView) * .pi / 180
-        let fx = Float((Double(width) / 2) / tan(hfov / 2))
+        let sensorFOV = Double(device.activeFormat.videoFieldOfView) * .pi / 180
+        guard sensorFOV > 0 else {
+            return CameraIntrinsics(fx: Float(longSide), fy: Float(longSide), cx: cx, cy: cy)
+        }
+        let focal = Float((longSide / 2) / tan(sensorFOV / 2))
         // Ultra-wide (~120°) carries strong barrel distortion; plain wide / any
         // unknown lens → identity (no change). Gated by LensProfileTable.
         let isUltraWide = device.deviceType == .builtInUltraWideCamera
         let profile = LensProfileTable.profile(isUltraWide: isUltraWide)
-        return CameraIntrinsics(fx: fx, fy: fx,
-                                cx: Float(width) / 2, cy: Float(height) / 2,
+        return CameraIntrinsics(fx: focal, fy: focal, cx: cx, cy: cy,
                                 k1: profile.k1, k2: profile.k2, k3: profile.k3)
     }
 
     // MARK: - Sample buffer handling
 
     private func handleSampleBuffer(_ buffer: CVPixelBuffer) {
-        latestPixelBuffer = buffer
-        let score = BlurEstimator.sharpnessScore(of: buffer)
-        onSharpness?(score)
+        let now = CACurrentMediaTime()
+        guard now - lastSharpnessTime >= Self.sharpnessInterval else { return }
+        lastSharpnessTime = now
+        onSharpness?(BlurEstimator.sharpnessScore(of: buffer))
     }
 }
 

@@ -218,6 +218,7 @@ public actor LiveReconstructionManager {
         return try textureLoader.newTexture(
             cgImage: cg,
             options: [.origin: MTKTextureLoader.Origin.topLeft,
+                      .SRGB: NSNumber(value: true),   // linear, like the stitcher
                       .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)])
     }
 

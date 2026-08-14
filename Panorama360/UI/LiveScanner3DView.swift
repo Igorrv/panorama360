@@ -123,12 +123,12 @@ struct LiveScanner3DView: View {
         // In project ("add scene") mode a finished capture goes straight to
         // stitching so it becomes a scene; standalone captures land in the node
         // galaxy as before.
+        // Every finished capture — project scene or standalone — runs through
+        // the stitcher so the result is ALWAYS a navigable 360° photo (not the
+        // legacy node galaxy). `StitchingView` then commits it to the project
+        // (add-scene mode) or opens the immersive viewer (standalone).
         vm.onComplete = { session in
-            if router.captureContext != nil {
-                router.goStitching(session)
-            } else {
-                router.goWorld(session)
-            }
+            router.goStitching(session)
         }
         vm.onCancel = {
             if router.captureContext != nil {

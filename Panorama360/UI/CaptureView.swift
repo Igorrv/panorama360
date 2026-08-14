@@ -93,7 +93,10 @@ struct CaptureView: View {
                 guard !didStart else { return }
                 didStart = true
                 vm.setViewport(geo.size)
-                vm.onComplete = { router.goWorld($0) }
+                // Finish always runs the stitcher so the tutorial ends in a real
+                // navigable 360° photo; the viewer's back button then clears
+                // onboarding. (Was `goWorld` — the legacy node galaxy, not a panorama.)
+                vm.onComplete = { router.goStitching($0) }
                 // From the tutorial, cancel returns to onboarding; otherwise a fresh capture.
                 vm.onCancel = {
                     if router.tutorialActive { router.goOnboarding() } else { router.goCapture() }

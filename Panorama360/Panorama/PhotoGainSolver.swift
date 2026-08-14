@@ -152,6 +152,7 @@ public final class PhotoGainSolver {
               let texture = try? textureLoader.newTexture(
                 cgImage: cg,
                 options: [.origin: MTKTextureLoader.Origin.topLeft,
+                          .SRGB: NSNumber(value: true),   // gains are solved in linear light
                           .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)]),
               let buffer = commandQueue.makeCommandBuffer() else { return nil }
 

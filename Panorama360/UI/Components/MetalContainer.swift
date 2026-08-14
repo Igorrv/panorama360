@@ -17,7 +17,9 @@ struct MetalContainer: UIViewRepresentable {
     func makeUIView(context: Context) -> MTKView {
         let view = MTKView()
         view.device = MTLCreateSystemDefaultDevice()
-        view.colorPixelFormat = .bgra8Unorm
+        // sRGB drawable: the renderer works in linear light, so the encode has to
+        // happen here or the panorama shows up noticeably dark.
+        view.colorPixelFormat = .bgra8Unorm_srgb
         view.framebufferOnly = true
         view.enableSetNeedsDisplay = false
         view.isPaused = false                  // continuous rendering

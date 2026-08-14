@@ -31,7 +31,7 @@ public final class Undistorter {
         let desc = MTLRenderPipelineDescriptor()
         desc.vertexFunction = vertex
         desc.fragmentFunction = fragment
-        desc.colorAttachments[0].pixelFormat = .bgra8Unorm
+        desc.colorAttachments[0].pixelFormat = .rgba8Unorm_srgb
         do {
             pipeline = try device.makeRenderPipelineState(descriptor: desc)
         } catch {
@@ -48,6 +48,7 @@ public final class Undistorter {
         let width = cgImage.width, height = cgImage.height
         let srcOpts: [MTKTextureLoader.Option: Any] = [
             .origin: MTKTextureLoader.Origin.topLeft,   // matches the projector's load convention
+            .SRGB: NSNumber(value: true),               // sample linear, store sRGB (see makeTexture)
             .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)
         ]
         let src = try textureLoader.newTexture(cgImage: cgImage, options: srcOpts)
@@ -90,10 +91,12 @@ public final class Undistorter {
         return desc
     }
 
+    /// sRGB storage, not plain unorm: the shader works in linear light, and
+    /// packing linear values into 8 bits crushes the shadows into visible bands.
     private static func makeTexture(device: MTLDevice, width: Int, height: Int,
                                     usage: MTLTextureUsage) throws -> MTLTexture {
         let desc = MTLTextureDescriptor.texture2DDescriptor(
-            pixelFormat: .bgra8Unorm, width: width, height: height, mipmapped: false)
+            pixelFormat: .rgba8Unorm_srgb, width: width, height: height, mipmapped: false)
         desc.usage = usage
         desc.storageMode = .private
         guard let texture = device.makeTexture(descriptor: desc) else { throw StitchError.renderFailed }

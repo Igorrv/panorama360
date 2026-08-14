@@ -33,7 +33,7 @@ public final class PanoramaRenderer: NSObject, MTKViewDelegate {
         let desc = MTLRenderPipelineDescriptor()
         desc.vertexFunction = vertex
         desc.fragmentFunction = fragment
-        desc.colorAttachments[0].pixelFormat = .bgra8Unorm
+        desc.colorAttachments[0].pixelFormat = .bgra8Unorm_srgb   // must match MetalContainer's view
         do {
             pipeline = try device.makeRenderPipelineState(descriptor: desc)
         } catch {
@@ -73,6 +73,7 @@ public final class PanoramaRenderer: NSObject, MTKViewDelegate {
         }
         let opts: [MTKTextureLoader.Option: Any] = [
             .origin: MTKTextureLoader.Origin.bottomLeft,
+            .SRGB: NSNumber(value: true),   // sample linear; the drawable re-encodes
             .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)
         ]
         do {
@@ -97,6 +98,7 @@ public final class PanoramaRenderer: NSObject, MTKViewDelegate {
         }
         let opts: [MTKTextureLoader.Option: Any] = [
             .origin: MTKTextureLoader.Origin.bottomLeft,
+            .SRGB: NSNumber(value: true),   // sample linear; the drawable re-encodes
             .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)
         ]
         do {

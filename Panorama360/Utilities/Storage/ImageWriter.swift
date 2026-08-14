@@ -37,8 +37,9 @@ public enum ImageWriter {
         }
         let jpgURL = dir.appendingPathComponent(name).appendingPathExtension("jpg")
 
-        // Preferred path: decode once → recompress JPEG @ quality.
-        if let cg = Self.decode(data) {
+        // Preferred path: decode once → rotate upright → recompress JPEG @ quality.
+        if let decoded = Self.decode(data) {
+            let cg = Self.upright(decoded, orientation: Self.orientation(of: photo))
             do {
                 try write(cg, to: jpgURL, compressionQuality: quality)
                 Log.storage.info("Saved JPEG \(jpgURL.lastPathComponent, privacy: .public) (\(cg.width)×\(cg.height))")
@@ -48,12 +49,13 @@ public enum ImageWriter {
             }
         }
 
-        // Fallback: the camera's original payload, untouched.
+        // Fallback: the camera's original payload, untouched. The stitcher reads
+        // raw pixels, so a non-upright photo here will be rotated in the sphere.
         let ext = preferredExtension(for: data) ?? "jpg"
         let rawURL = dir.appendingPathComponent(name).appendingPathExtension(ext)
         try data.write(to: rawURL, options: .atomic)
         let dims = dimensions(from: data) ?? (4032, 3024)
-        Log.storage.info("Saved raw \(rawURL.lastPathComponent, privacy: .public) (fallback)")
+        Log.storage.warning("Saved raw \(rawURL.lastPathComponent, privacy: .public) (fallback — orientation not normalised)")
         return (rawURL, dims.0, dims.1)
     }
 
@@ -99,6 +101,39 @@ public enum ImageWriter {
         guard let cg = cgImage else { throw ImageWriterError.renderFailed }
         try write(cg, to: url, compressionQuality: compressionQuality)
     }
+
+    // MARK: - Orientation
+
+    /// The orientation AVFoundation attached to the capture.
+    public static func orientation(of photo: AVCapturePhoto) -> CGImagePropertyOrientation {
+        guard let raw = photo.metadata[kCGImagePropertyOrientation as String] as? NSNumber,
+              let orientation = CGImagePropertyOrientation(rawValue: raw.uint32Value) else {
+            return .up
+        }
+        return orientation
+    }
+
+    /// Rotates the pixels so the stored file needs no orientation metadata.
+    ///
+    /// Setting the capture connection to portrait does not guarantee rotated
+    /// pixels — AVFoundation is free to leave them in sensor orientation and
+    /// describe the rotation in EXIF instead. The stitcher reads raw pixels and
+    /// ignores EXIF, so a photo left that way lands in the sphere rotated 90°.
+    /// Baking the rotation in here makes the on-disk file the single truth, and
+    /// costs nothing extra because this path already decodes and re-encodes.
+    public static func upright(_ image: CGImage,
+                               orientation: CGImagePropertyOrientation) -> CGImage {
+        guard orientation != .up else { return image }
+        let oriented = CIImage(cgImage: image).oriented(orientation)
+        guard let rotated = sharedContext.createCGImage(oriented, from: oriented.extent) else {
+            Log.storage.warning("Could not rotate photo upright; storing as captured")
+            return image
+        }
+        return rotated
+    }
+
+    /// Reused across captures — building a `CIContext` per photo is expensive.
+    private static let sharedContext = CIContext(options: [.useSoftwareRenderer: false])
 
     // MARK: - Helpers
 

@@ -144,9 +144,12 @@ public final class MetalSphereProjector: PanoramaStitcher {
         let finalTexture = try render(samples: samples, orientations: orientations, gains: gains,
                                       onProgress: onProgress)
 
-        // Stage: finalize + write.
+        // Stage: finalize + write. The accumulator holds linear light, so it has
+        // to be tagged as such — otherwise Core Image writes those values out as
+        // if they were already gamma-encoded and the panorama lands dark.
         onProgress(0.94, .finalizing)
-        let ciImage = CIImage(mtlTexture: finalTexture, options: nil)?
+        let workingSpace = CGColorSpace(name: CGColorSpace.linearSRGB) ?? CGColorSpaceCreateDeviceRGB()
+        let ciImage = CIImage(mtlTexture: finalTexture, options: [.colorSpace: workingSpace])?
             .transformed(by: CGAffineTransform(scaleX: 1, y: -1))
             .transformed(by: CGAffineTransform(translationX: 0, y: CGFloat(options.outputHeight)))
         guard let ciImage else { throw StitchError.renderFailed }
@@ -328,9 +331,14 @@ public final class MetalSphereProjector: PanoramaStitcher {
             return try undistorter.undistort(cgImage: cg, intrinsics: intr)
         }
         let origin: MTKTextureLoader.Origin = options.textureOriginTopLeft ? .topLeft : .bottomLeft
+        // Force an sRGB format so sampling always returns **linear** light.
+        // Left to infer, the format depended on the file's colour profile, and
+        // averaging gamma-encoded values is wrong anyway: two photos of the same
+        // wall at different exposures do not average to the right brightness.
         return try textureLoader.newTexture(
             cgImage: cg,
             options: [.origin: origin,
+                      .SRGB: NSNumber(value: true),
                       .textureUsage: NSNumber(value: MTLTextureUsage.shaderRead.rawValue)])
     }
 

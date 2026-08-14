@@ -13,9 +13,11 @@ import UIKit
 ///   published on the main thread via `setThumbnailHandler`, so the live 3D
 ///   node is textured at once.
 /// - **Stream B (high-res persistence):** the full frame is decoded **once**,
-///   recompressed to JPEG @0.85 and written into `NSTemporaryDirectory()` on a
-///   low-priority queue inside an `autoreleasepool`, so the heavy buffer is
-///   freed the instant the file lands.
+///   recompressed to JPEG @0.85 and written into the durable session images
+///   directory (`Documents/Panorama360/<id>/images/`) on a low-priority queue
+///   inside an `autoreleasepool`, so the heavy buffer is freed the instant the
+///   file lands. (Not `NSTemporaryDirectory()` — iOS can sweep temp files and
+///   starve the stitcher of its source photos.)
 public actor CaptureManager {
 
     public enum CaptureError: LocalizedError {
@@ -71,9 +73,11 @@ public actor CaptureManager {
 
         let (url, width, height): (URL, Int, Int)
         do {
+            // Resolve the durable images dir from the store (not NSTemporaryDirectory).
+            let imagesDir = store.imagesDirectory(for: sessionID)
             (url, width, height) = try await Self.process(photo: photo,
                                                           nodeID: point.id,
-                                                          sessionID: sessionID,
+                                                          imagesDir: imagesDir,
                                                           streamA: streamA)
         } catch ImageWriterError.noData {
             throw CaptureError.cameraNoData
@@ -100,14 +104,14 @@ public actor CaptureManager {
     /// Runs both streams on the low-priority queue inside one `autoreleasepool`.
     private static func process(photo: AVCapturePhoto,
                                 nodeID: UUID,
-                                sessionID: UUID,
+                                imagesDir: URL,
                                 streamA: ((UUID, UIImage) -> Void)?) async throws -> (URL, Int, Int) {
         try await withCheckedThrowingContinuation { (cont: CheckedContinuation<(URL, Int, Int), Error>) in
             persistQueue.async {
                 let outcome: Result<(URL, Int, Int), Error>
                 do {
                     let tuple = try autoreleasepool {
-                        try dualStream(photo: photo, nodeID: nodeID, sessionID: sessionID, streamA: streamA)
+                        try dualStream(photo: photo, nodeID: nodeID, imagesDir: imagesDir, streamA: streamA)
                     }
                     outcome = .success(tuple)
                 } catch {
@@ -121,7 +125,7 @@ public actor CaptureManager {
     /// Stream A (thumbnail) + Stream B (JPEG archive), sharing one data blob.
     private static func dualStream(photo: AVCapturePhoto,
                                    nodeID: UUID,
-                                   sessionID: UUID,
+                                   imagesDir: URL,
                                    streamA: ((UUID, UIImage) -> Void)?) throws -> (URL, Int, Int) {
         guard let data = photo.fileDataRepresentation() else { throw ImageWriterError.noData }
 
@@ -130,12 +134,15 @@ public actor CaptureManager {
             DispatchQueue.main.async { streamA?(nodeID, thumb) }
         }
 
-        // Stream B: full-res JPEG @0.85 into NSTemporaryDirectory().
-        let dir = archiveDirectory(sessionID: sessionID)
-        try ImageWriter.ensureDirectory(dir)
-        let jpgURL = dir.appendingPathComponent(nodeID.uuidString).appendingPathExtension("jpg")
+        // Stream B: full-res JPEG @0.85 into the durable session images dir.
+        try ImageWriter.ensureDirectory(imagesDir)
+        let jpgURL = imagesDir.appendingPathComponent(nodeID.uuidString).appendingPathExtension("jpg")
 
-        if let cg = decode(data) {
+        if let decoded = decode(data) {
+            // Bake the capture orientation into the pixels: the stitcher reads
+            // raw pixels and ignores EXIF, so anything left rotated here lands
+            // sideways in the sphere.
+            let cg = ImageWriter.upright(decoded, orientation: ImageWriter.orientation(of: photo))
             try ImageWriter.write(cg, to: jpgURL, compressionQuality: 0.85)
             Log.storage.info("Archived JPEG \(jpgURL.lastPathComponent, privacy: .public) (\(cg.width)×\(cg.height))")
             return (jpgURL, cg.width, cg.height)
@@ -148,12 +155,6 @@ public actor CaptureManager {
     }
 
     // MARK: - Helpers
-
-    private static func archiveDirectory(sessionID: UUID) -> URL {
-        URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true)
-            .appendingPathComponent("panorama360", isDirectory: true)
-            .appendingPathComponent(sessionID.uuidString, isDirectory: true)
-    }
 
     /// Exactly 256×256 (aspect-fill crop) via a down-scaled thumbnail decode —
     /// never decodes the full-resolution frame.

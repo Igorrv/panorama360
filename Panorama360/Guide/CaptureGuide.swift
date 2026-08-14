@@ -163,7 +163,14 @@ public final class CaptureGuide: ObservableObject {
         points[idx].state = .captured
         points[idx].confidence = 1
         points[idx].revision += 1
-        capturedCount = points.capturedCount
+        switch mode {
+        case .fixed:
+            capturedCount = points.capturedCount
+        case .dynamic:
+            // Dynamic mode replaces its only point after every shot. Counting
+            // the current array would therefore stay stuck at one forever.
+            capturedCount += 1
+        }
         capturePulse &+= 1
 
         if let pos = overlayPoints.first(where: { $0.id == pointID })?.position {

@@ -74,9 +74,19 @@ public final class CaptureViewModel: ObservableObject {
     private var lastCaptureTime: Double = 0
     private var captureIntervals: [Double] = []
     private let cooldown: Double = 0.6
+    /// Fewest captures before the manual "finish" path appears / proceeds —
+    /// stops a single stray shot from producing an all-black panorama.
+    private static let minFinishCaptures = 4
+    /// Max device rotation (radians) tolerated DURING one HDR exposure. The
+    /// `.quality` bracket spans several hundred ms; if the user starts turning in
+    /// that window the photo is motion-blurred and its recorded orientation no
+    /// longer matches where it was exposed — keeping it would smear the stitch.
+    /// Conservative so a steady hold is never false-rejected.
+    private static let maxCaptureMotion: Float = 6 * .pi / 180
     private var evaluateTask: Task<Void, Never>?
     private var fovConfigured = false
     private var consecutiveFailures = 0
+    private var didComplete = false
 
     /// Coverage target generator (dynamic mode only), built once the lens FOV is known.
     private var coverage: CoverageAnalyzer?
@@ -126,11 +136,14 @@ public final class CaptureViewModel: ObservableObject {
         let id = UUID()
         do {
             let dir = try store.makeSessionDirectory(id: id)
-            session = PanoramaSession(distribution: guide.distribution,
-                                      points: guide.points,
-                                      directoryURL: dir)
+            let newSession = PanoramaSession(id: id,
+                                             distribution: guide.distribution,
+                                             points: guide.points,
+                                             directoryURL: dir)
+            try store.persist(newSession)
+            session = newSession
         } catch {
-            errorMessage = "Não foi possível criar a pasta da sessão."
+            errorMessage = "Não foi possível criar ou salvar a sessão."
             return
         }
 
@@ -173,26 +186,33 @@ public final class CaptureViewModel: ObservableObject {
         onCancel?()
     }
 
-    /// Suspends camera + motion when backgrounded. iOS kills apps that keep the
-    /// camera running while suspended. The live globe is NOT torn down — its
-    /// textures persist and resume on foreground.
+    /// Suspends capture when backgrounded. iOS kills apps that keep the camera
+    /// running while suspended, so the camera must stop — but CoreMotion is
+    /// intentionally LEFT RUNNING. Stopping/restarting device-motion re-establishes
+    /// the `xArbitraryZVertical` heading origin and would shift the session frame,
+    /// breaking alignment between photos taken before and after the pause. While
+    /// suspended iOS pauses delivery anyway; on resume, updates continue in the
+    /// SAME frame, so every photo's quaternion stays consistent. The live globe is
+    /// not torn down — its textures persist and resume on foreground.
     public func suspend() {
         evaluateTask?.cancel()
         evaluateTask = nil
-        motion.stop()
         camera.stop()
     }
 
-    /// Resumes after foregrounding. Re-primes the motion reference so the
-    /// guidance baseline matches the device's current pose (no jump).
+    /// Resumes after foregrounding. CoreMotion was left running across the
+    /// suspension, so it is restarted ONLY if the system actually stopped it —
+    /// and the reference frame is NEVER reset. Re-anchoring the heading would
+    /// misalign every post-resume photo with the ones captured before the pause.
     public func resume() {
         guard isReady, session != nil else { return }
-        motion.resetReference()
-        do {
-            try motion.start()
-        } catch {
-            errorMessage = "Sensores de movimento indisponíveis."
-            return
+        if !motion.isRunning {
+            do {
+                try motion.start()
+            } catch {
+                errorMessage = "Sensores de movimento indisponíveis."
+                return
+            }
         }
         Task { try? await camera.start() }
         startEvaluating()
@@ -205,16 +225,12 @@ public final class CaptureViewModel: ObservableObject {
             errorMessage = "Sessão ainda não iniciada."
             return
         }
-        guard guide.capturedCount >= 1 else {
-            errorMessage = "Capture pelo menos um ponto antes de finalizar (mire em um ponto brilhante e fique parado)."
+        guard guide.capturedCount >= Self.minFinishCaptures else {
+            errorMessage = "Vire devagar mirando nos pontos para cobrir todo o ambiente — mínimo de \(Self.minFinishCaptures) fotos antes de montar o 360°."
             return
         }
-        evaluateTask?.cancel()
-        evaluateTask = nil
-        motion.stop()
-        camera.stop()
         Haptics.shared.captured()
-        onComplete?(session)
+        completeCapture(with: session)
     }
 
     /// Manual capture: fires immediately for the target you're aiming at,
@@ -232,7 +248,7 @@ public final class CaptureViewModel: ObservableObject {
         await capture(point: point, orientation: orientation)
     }
 
-    public var canFinish: Bool { guide.capturedCount >= 1 }
+    public var canFinish: Bool { guide.capturedCount >= Self.minFinishCaptures }
 
     public func dismissError() { errorMessage = nil }
 
@@ -253,14 +269,16 @@ public final class CaptureViewModel: ObservableObject {
         configureFOVIfNeeded()
     }
 
+    /// The guide projects targets onto the *screen*, so it needs the portrait
+    /// horizontal FOV — not the sensor's landscape one, which drew every dot
+    /// off to the side of the object it was meant to sit on. Coverage uses the
+    /// narrow half-FOV so a shot is never credited with more sphere than it saw.
     private func configureFOVIfNeeded() {
-        guard !fovConfigured, let device = camera.videoDevice else { return }
-        let fov = device.activeFormat.videoFieldOfView * .pi / 180
-        if fov > 0 { guide.horizontalFOV = Double(fov) }
+        guard !fovConfigured, let fov = camera.photoFOV else { return }
+        guide.horizontalFOV = fov.horizontal
         fovConfigured = true
-        // Build the coverage analyzer now that the lens FOV is known.
         if guide.mode == .dynamic, coverage == nil {
-            coverage = CoverageAnalyzer(halfFOV: Double(fov) / 2)
+            coverage = CoverageAnalyzer(halfFOV: fov.narrowHalf)
         }
     }
 
@@ -357,9 +375,34 @@ public final class CaptureViewModel: ObservableObject {
             return
         }
 
+        // Quality guard: the HDR `.quality` exposure spans several hundred
+        // milliseconds. If the device rotated past `maxCaptureMotion` during that
+        // window the photo is motion-blurred and was exposed somewhere between the
+        // recorded orientation and the current one — keeping it would smear the
+        // stitch. Reject it, consume the cooldown, and let the gate re-fire once
+        // the user holds still. The threshold is conservative so a steady hand is
+        // never false-rejected.
+        if let post = latestOrientation {
+            let moved = Geometry.angularDistance(orientation.lookDirection, post.lookDirection)
+            if moved > Self.maxCaptureMotion {
+                lastCaptureTime = Date().timeIntervalSince1970
+                consecutiveFailures += 1
+                Haptics.shared.cancelled()
+                Log.capture.warning("Rejected capture: device rotated \(Int(moved * 180 / .pi))° during exposure")
+                if consecutiveFailures >= 3 {
+                    errorMessage = "O celular está se movendo durante a foto. Segure firme e parado em cada ponto até a captura concluir."
+                }
+                return
+            }
+        }
+
         // Success — feedback sequence: haptic + shutter sound + green check + globe update.
         consecutiveFailures = 0
         guide.markCaptured(pointID: point.id)
+        if guide.mode == .dynamic,
+           !session.points.contains(where: { $0.id == point.id }) {
+            session.points.append(point)
+        }
         session.record(sample: sample, forPointID: point.id)
         self.session = session
         try? store.persist(session)
@@ -388,9 +431,21 @@ public final class CaptureViewModel: ObservableObject {
             complete = coverageComplete
         }
         if complete {
-            evaluateTask?.cancel()
-            onComplete?(session)
+            completeCapture(with: session)
         }
+    }
+
+    /// Ends the capture pipeline exactly once and releases camera/motion before
+    /// the memory-heavy stitch begins. Both manual and automatic completion use
+    /// this path so neither can leave capture hardware running behind the viewer.
+    private func completeCapture(with session: PanoramaSession) {
+        guard !didComplete else { return }
+        didComplete = true
+        evaluateTask?.cancel()
+        evaluateTask = nil
+        motion.stop()
+        camera.stop()
+        onComplete?(session)
     }
 
     /// Records the capture in the coverage analyzer and replaces the active

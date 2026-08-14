@@ -22,7 +22,9 @@ struct LiveMeshPreview: UIViewRepresentable {
     func makeUIView(context: Context) -> MTKView {
         let view = MTKView()
         view.device = MTLCreateSystemDefaultDevice()
-        view.colorPixelFormat = .bgra8Unorm
+        // sRGB drawable — the live globe accumulates in linear light (see
+        // MetalContainer for the same reasoning).
+        view.colorPixelFormat = .bgra8Unorm_srgb
         view.framebufferOnly = true
         view.enableSetNeedsDisplay = false
         view.isPaused = false                  // continuous rendering

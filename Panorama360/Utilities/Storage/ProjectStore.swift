@@ -7,7 +7,8 @@ import os
 ///
 /// Owns a `SessionStore` reference so it can resolve a `TourScene`'s equirect
 /// on demand (`equirectURL(for:)`) — the project never copies or owns the
-/// finished panorama; it points at the source session's `panorama.heic`.
+/// finished panorama; it points at the source session's `panorama.jpg` (or the
+/// legacy `panorama.heic` when a session predates the JPEG migration).
 public final class ProjectStore {
 
     public let rootDirectory: URL

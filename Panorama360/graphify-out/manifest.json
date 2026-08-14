@@ -1,0 +1,547 @@
+{
+  "App/AppRouter.swift": {
+    "mtime": 1785905959.0407453,
+    "ast_hash": "31bfa5aa44ba94f6a4f25c00f66b20a8",
+    "semantic_hash": "31bfa5aa44ba94f6a4f25c00f66b20a8"
+  },
+  "App/Panorama360App.swift": {
+    "mtime": 1784054399.6158159,
+    "ast_hash": "376daafc3a11671d725a86e97765c656",
+    "semantic_hash": "376daafc3a11671d725a86e97765c656"
+  },
+  "Device/AR/ARSessionManager.swift": {
+    "mtime": 1785823916.9569476,
+    "ast_hash": "ed281bb7d75527cbef57b29a7b103680",
+    "semantic_hash": "ed281bb7d75527cbef57b29a7b103680"
+  },
+  "Device/AR/MeshTexturizer.swift": {
+    "mtime": 1785820949.9083538,
+    "ast_hash": "e9adf1c24db34a0cea3f36a7b505b8fd",
+    "semantic_hash": "e9adf1c24db34a0cea3f36a7b505b8fd"
+  },
+  "Device/AR/OrientationResolver.swift": {
+    "mtime": 1785823912.7801225,
+    "ast_hash": "df50771847e6de7ddd923c4c3ab882f5",
+    "semantic_hash": "df50771847e6de7ddd923c4c3ab882f5"
+  },
+  "Device/AR/RoomScanner.swift": {
+    "mtime": 1785820951.2740915,
+    "ast_hash": "872e38402bc160606af15e2f54253dcf",
+    "semantic_hash": "872e38402bc160606af15e2f54253dcf"
+  },
+  "Device/Camera/CameraEngine.swift": {
+    "mtime": 1784564564.4411292,
+    "ast_hash": "0d33f131f500b8ee10a5b32521a497b2",
+    "semantic_hash": "0d33f131f500b8ee10a5b32521a497b2"
+  },
+  "Device/Camera/CameraStatus.swift": {
+    "mtime": 1783903828.0575092,
+    "ast_hash": "cb7718f73be7077f2e194db4cbc00c24",
+    "semantic_hash": "cb7718f73be7077f2e194db4cbc00c24"
+  },
+  "Device/Camera/PhotoCaptureDelegate.swift": {
+    "mtime": 1783912430.8722777,
+    "ast_hash": "62cbd3be71f00b94b9c0336bb0c12972",
+    "semantic_hash": "62cbd3be71f00b94b9c0336bb0c12972"
+  },
+  "Device/Capture/CaptureConfidenceEngine.swift": {
+    "mtime": 1783920466.1606755,
+    "ast_hash": "1844b3779e277c23f247e44c7c489fba",
+    "semantic_hash": "1844b3779e277c23f247e44c7c489fba"
+  },
+  "Device/Capture/CaptureGate.swift": {
+    "mtime": 1783918534.5870538,
+    "ast_hash": "d2188f94a3265c3b69a452fa4704be74",
+    "semantic_hash": "d2188f94a3265c3b69a452fa4704be74"
+  },
+  "Device/Capture/CaptureManager.swift": {
+    "mtime": 1785905727.7836447,
+    "ast_hash": "bba46560b98bf259c07281172ad013b2",
+    "semantic_hash": "bba46560b98bf259c07281172ad013b2"
+  },
+  "Device/Motion/MotionEngine.swift": {
+    "mtime": 1786024145.6794167,
+    "ast_hash": "62529879c64b5a6752f2e03b4b34146c",
+    "semantic_hash": "62529879c64b5a6752f2e03b4b34146c"
+  },
+  "Device/Motion/StabilityEstimator.swift": {
+    "mtime": 1783899007.367804,
+    "ast_hash": "682bdf59fe339cefaee0348d4c07154f",
+    "semantic_hash": "682bdf59fe339cefaee0348d4c07154f"
+  },
+  "Domain/CapturePoint.swift": {
+    "mtime": 1783897327.3613906,
+    "ast_hash": "662c3cc90233cb9745572da7d1d87a65",
+    "semantic_hash": "662c3cc90233cb9745572da7d1d87a65"
+  },
+  "Domain/CapturePointState.swift": {
+    "mtime": 1783918550.046908,
+    "ast_hash": "aef63f6891bd287ed8755a94b0457184",
+    "semantic_hash": "aef63f6891bd287ed8755a94b0457184"
+  },
+  "Domain/CaptureSample.swift": {
+    "mtime": 1785823893.8981442,
+    "ast_hash": "d7de19be144934ad38a146b66b24a124",
+    "semantic_hash": "d7de19be144934ad38a146b66b24a124"
+  },
+  "Domain/DeviceOrientation.swift": {
+    "mtime": 1783897695.6333232,
+    "ast_hash": "a4ee05a987b8175f8a359f003050125d",
+    "semantic_hash": "a4ee05a987b8175f8a359f003050125d"
+  },
+  "Domain/Hotspot.swift": {
+    "mtime": 1784578683.0321808,
+    "ast_hash": "347c3a82cc602b560091ccee1f3ab16d",
+    "semantic_hash": "347c3a82cc602b560091ccee1f3ab16d"
+  },
+  "Domain/PanoramaSession.swift": {
+    "mtime": 1783897369.396731,
+    "ast_hash": "5b281a687d76666d37777b7618effc2c",
+    "semantic_hash": "5b281a687d76666d37777b7618effc2c"
+  },
+  "Domain/Project.swift": {
+    "mtime": 1784910217.955303,
+    "ast_hash": "f51719de6f954dda73ae54d4d542766b",
+    "semantic_hash": "f51719de6f954dda73ae54d4d542766b"
+  },
+  "Domain/RoomMesh.swift": {
+    "mtime": 1785813181.101651,
+    "ast_hash": "abe1f212af7a6f4f9147009c7a2639db",
+    "semantic_hash": "abe1f212af7a6f4f9147009c7a2639db"
+  },
+  "Domain/SphereDistribution.swift": {
+    "mtime": 1784563916.4899223,
+    "ast_hash": "578c3c4c5eb735acbafc03c1bb3f6476",
+    "semantic_hash": "578c3c4c5eb735acbafc03c1bb3f6476"
+  },
+  "Domain/TourScene.swift": {
+    "mtime": 1786025483.3202088,
+    "ast_hash": "0f26aa0bf32054d4e44be333ac83ae19",
+    "semantic_hash": "0f26aa0bf32054d4e44be333ac83ae19"
+  },
+  "Guide/CaptureGuide.swift": {
+    "mtime": 1784003386.765695,
+    "ast_hash": "18b4a678386528a1ad4a7a8413b61423",
+    "semantic_hash": "18b4a678386528a1ad4a7a8413b61423"
+  },
+  "Guide/CoverageAnalyzer.swift": {
+    "mtime": 1783920654.824911,
+    "ast_hash": "3c2dfe1d82f74a1d8d64bead89ee9779",
+    "semantic_hash": "3c2dfe1d82f74a1d8d64bead89ee9779"
+  },
+  "Guide/PoseProjectionEngine.swift": {
+    "mtime": 1784003834.0901093,
+    "ast_hash": "3307b722198b1c967246d67641f239ba",
+    "semantic_hash": "3307b722198b1c967246d67641f239ba"
+  },
+  "Guide/SpherePointGenerator.swift": {
+    "mtime": 1783899246.7616444,
+    "ast_hash": "cf82e7c2ad31e2a8b73e7ed756a1a3e5",
+    "semantic_hash": "cf82e7c2ad31e2a8b73e7ed756a1a3e5"
+  },
+  "Panorama360-Bridging-Header.h": {
+    "mtime": 1783901285.3978322,
+    "ast_hash": "ddd95701689ea6f2c20330a1c9a349f0",
+    "semantic_hash": "ddd95701689ea6f2c20330a1c9a349f0"
+  },
+  "Panorama/BandBlender.swift": {
+    "mtime": 1785824102.1494722,
+    "ast_hash": "541db6887f2300af839afedaea37577e",
+    "semantic_hash": "541db6887f2300af839afedaea37577e"
+  },
+  "Panorama/BlendShaders.metal": {
+    "mtime": 1785824072.0869975,
+    "ast_hash": "b6177989418a9c7bc3b65771dab907e4",
+    "semantic_hash": "b6177989418a9c7bc3b65771dab907e4"
+  },
+  "Panorama/ExposureCompensator.swift": {
+    "mtime": 1783901755.0781918,
+    "ast_hash": "788ee673491c3d54bbf562c69bc86f43",
+    "semantic_hash": "788ee673491c3d54bbf562c69bc86f43"
+  },
+  "Panorama/HorizonLeveler.swift": {
+    "mtime": 1785823934.1197772,
+    "ast_hash": "872c5aa3763bdb4fd281c5fa58404255",
+    "semantic_hash": "872c5aa3763bdb4fd281c5fa58404255"
+  },
+  "Panorama/LensProfile.swift": {
+    "mtime": 1784564571.874723,
+    "ast_hash": "1809352e0efd5baeacba42a9afa213ce",
+    "semantic_hash": "1809352e0efd5baeacba42a9afa213ce"
+  },
+  "Panorama/LiveExposureTracker.swift": {
+    "mtime": 1784564052.7647462,
+    "ast_hash": "689f88f7b6c5630a08fd4f5aac6fb286",
+    "semantic_hash": "689f88f7b6c5630a08fd4f5aac6fb286"
+  },
+  "Panorama/LiveReconstructionManager.swift": {
+    "mtime": 1785823968.1955132,
+    "ast_hash": "d781eec165fdab822b82e98d55ca65fb",
+    "semantic_hash": "d781eec165fdab822b82e98d55ca65fb"
+  },
+  "Panorama/MetalSphereProjector.swift": {
+    "mtime": 1785824212.9566028,
+    "ast_hash": "2610339bc6261a3fe89c2a61aef92073",
+    "semantic_hash": "2610339bc6261a3fe89c2a61aef92073"
+  },
+  "Panorama/OpenCV/OpenCVStitcher.swift": {
+    "mtime": 1783899551.4404914,
+    "ast_hash": "4baeafd435c92742f91a6713b33da5fe",
+    "semantic_hash": "4baeafd435c92742f91a6713b33da5fe"
+  },
+  "Panorama/PanoramaEngine.swift": {
+    "mtime": 1786593055.164482,
+    "ast_hash": "e38814849069b063470209714253e7d0",
+    "semantic_hash": "e38814849069b063470209714253e7d0"
+  },
+  "Panorama/PanoramaShaders.metal": {
+    "mtime": 1785823963.4968085,
+    "ast_hash": "e20432e13992678e0b8ebeac336d73df",
+    "semantic_hash": "e20432e13992678e0b8ebeac336d73df"
+  },
+  "Panorama/PanoramaStitcher.swift": {
+    "mtime": 1785824222.9026487,
+    "ast_hash": "a83d32ce10bb7f5fa4769c7b57ab5f70",
+    "semantic_hash": "a83d32ce10bb7f5fa4769c7b57ab5f70"
+  },
+  "Panorama/PhotoGainSolver.swift": {
+    "mtime": 1785824052.5787878,
+    "ast_hash": "733ac477e7e5292ee9df2cecb3ac067d",
+    "semantic_hash": "733ac477e7e5292ee9df2cecb3ac067d"
+  },
+  "Panorama/PoleFillShaders.metal": {
+    "mtime": 1784565172.6915474,
+    "ast_hash": "cc16c7fbacec303f450c49e391caab74",
+    "semantic_hash": "cc16c7fbacec303f450c49e391caab74"
+  },
+  "Panorama/PoleFiller.swift": {
+    "mtime": 1785824247.9567325,
+    "ast_hash": "03ea1e7d6cfad8fadaed19ec99abbef9",
+    "semantic_hash": "03ea1e7d6cfad8fadaed19ec99abbef9"
+  },
+  "Panorama/UndistortShaders.metal": {
+    "mtime": 1784564580.9158537,
+    "ast_hash": "217eee0d363db0c2e9f6488879c426ca",
+    "semantic_hash": "217eee0d363db0c2e9f6488879c426ca"
+  },
+  "Panorama/Undistorter.swift": {
+    "mtime": 1784565388.8496573,
+    "ast_hash": "2fb7c03a6b5b199b0309ca80e6e75de3",
+    "semantic_hash": "2fb7c03a6b5b199b0309ca80e6e75de3"
+  },
+  "Presentation/AutoLinker.swift": {
+    "mtime": 1784577961.4509103,
+    "ast_hash": "eaf15e87c9565353d29dc8619ff43ca2",
+    "semantic_hash": "eaf15e87c9565353d29dc8619ff43ca2"
+  },
+  "Presentation/AutoPlayCoordinator.swift": {
+    "mtime": 1784578175.7997005,
+    "ast_hash": "2d47d35c9bf983d625fb26acaafb7bee",
+    "semantic_hash": "2d47d35c9bf983d625fb26acaafb7bee"
+  },
+  "Presentation/CaptureViewModel.swift": {
+    "mtime": 1786024155.4263155,
+    "ast_hash": "00d58efaed72f9ac37a6366a7c77b69e",
+    "semantic_hash": "00d58efaed72f9ac37a6366a7c77b69e"
+  },
+  "Presentation/LibraryViewModel.swift": {
+    "mtime": 1784092644.5787067,
+    "ast_hash": "ffb0970f05c44f174bea78f3b8f18597",
+    "semantic_hash": "ffb0970f05c44f174bea78f3b8f18597"
+  },
+  "Presentation/ProjectDetailViewModel.swift": {
+    "mtime": 1785820859.5208528,
+    "ast_hash": "6bbfe21ebf464eccaecfae2bdf8ce0d9",
+    "semantic_hash": "6bbfe21ebf464eccaecfae2bdf8ce0d9"
+  },
+  "Presentation/RoomScanViewModel.swift": {
+    "mtime": 1785814720.3144686,
+    "ast_hash": "ee8d9f97e0c4503fc7bc233b3cfb9ac2",
+    "semantic_hash": "ee8d9f97e0c4503fc7bc233b3cfb9ac2"
+  },
+  "Presentation/StitchingViewModel.swift": {
+    "mtime": 1783901985.7118812,
+    "ast_hash": "494bcd20b68977036144ad9092495285",
+    "semantic_hash": "494bcd20b68977036144ad9092495285"
+  },
+  "Presentation/TourViewerViewModel.swift": {
+    "mtime": 1785820860.823032,
+    "ast_hash": "9cabf79424644aaa65b0fb4699de5338",
+    "semantic_hash": "9cabf79424644aaa65b0fb4699de5338"
+  },
+  "Presentation/ViewerViewModel.swift": {
+    "mtime": 1783899769.9133787,
+    "ast_hash": "4cea7b5576ab9a788b28d1597e42a812",
+    "semantic_hash": "4cea7b5576ab9a788b28d1597e42a812"
+  },
+  "Presentation/WalkViewModel.swift": {
+    "mtime": 1785820885.5679414,
+    "ast_hash": "5804c840b0151ff831f613467de4fca7",
+    "semantic_hash": "5804c840b0151ff831f613467de4fca7"
+  },
+  "Resources/Assets.xcassets/AccentColor.colorset/Contents.json": {
+    "mtime": 1784054415.6657143,
+    "ast_hash": "485b80bbe5e72533d53dc5a55bfb2c9a",
+    "semantic_hash": "485b80bbe5e72533d53dc5a55bfb2c9a"
+  },
+  "Resources/Assets.xcassets/AppIcon.appiconset/Contents.json": {
+    "mtime": 1783901124.0626943,
+    "ast_hash": "656e426612a7126f2dc91453413e7c4a",
+    "semantic_hash": "656e426612a7126f2dc91453413e7c4a"
+  },
+  "Resources/Assets.xcassets/Contents.json": {
+    "mtime": 1783901115.6551316,
+    "ast_hash": "9deb2ada1cc834bbebf8bbad9c8978a1",
+    "semantic_hash": "9deb2ada1cc834bbebf8bbad9c8978a1"
+  },
+  "Resources/Assets.xcassets/LaunchColor.colorset/Contents.json": {
+    "mtime": 1784054404.306459,
+    "ast_hash": "56ce08aa6d5c819c39aa5426cdc4e299",
+    "semantic_hash": "56ce08aa6d5c819c39aa5426cdc4e299"
+  },
+  "UI/BrandingSheet.swift": {
+    "mtime": 1784910248.181916,
+    "ast_hash": "95e72be16590c9def0836fa7dba8a669",
+    "semantic_hash": "95e72be16590c9def0836fa7dba8a669"
+  },
+  "UI/CameraPreview.swift": {
+    "mtime": 1783900907.9225304,
+    "ast_hash": "96f36644b7d3fc9fc3b1893d0b132922",
+    "semantic_hash": "96f36644b7d3fc9fc3b1893d0b132922"
+  },
+  "UI/CaptureOverlay.swift": {
+    "mtime": 1784063029.105336,
+    "ast_hash": "dcece845426827fec924ce514324fb25",
+    "semantic_hash": "dcece845426827fec924ce514324fb25"
+  },
+  "UI/CaptureView.swift": {
+    "mtime": 1786025330.9267218,
+    "ast_hash": "6d4adfa74684d00c48acc92ab6bce05f",
+    "semantic_hash": "6d4adfa74684d00c48acc92ab6bce05f"
+  },
+  "UI/Components/CircularProgressView.swift": {
+    "mtime": 1784056391.809658,
+    "ast_hash": "0bb10528edb2a678c2272b07f1e4bf31",
+    "semantic_hash": "0bb10528edb2a678c2272b07f1e4bf31"
+  },
+  "UI/Components/GlowModifier.swift": {
+    "mtime": 1784053610.2237468,
+    "ast_hash": "d95a9dec736849cafac39fa2e86fa3d7",
+    "semantic_hash": "d95a9dec736849cafac39fa2e86fa3d7"
+  },
+  "UI/Components/HUDRing.swift": {
+    "mtime": 1784005482.2252572,
+    "ast_hash": "9bc716bf2bc8b096f14ed3faa964324e",
+    "semantic_hash": "9bc716bf2bc8b096f14ed3faa964324e"
+  },
+  "UI/Components/HoloBackground.swift": {
+    "mtime": 1784005501.4358623,
+    "ast_hash": "321e9400254142b49975cad983bba956",
+    "semantic_hash": "321e9400254142b49975cad983bba956"
+  },
+  "UI/Components/HoloButton.swift": {
+    "mtime": 1784056325.3618777,
+    "ast_hash": "33cf24f63fa5e9648ceecd109b8a325c",
+    "semantic_hash": "33cf24f63fa5e9648ceecd109b8a325c"
+  },
+  "UI/Components/MetalContainer.swift": {
+    "mtime": 1784574603.1821418,
+    "ast_hash": "17a1a21920d623892e8592c381ed2c2b",
+    "semantic_hash": "17a1a21920d623892e8592c381ed2c2b"
+  },
+  "UI/Components/ScanlineOverlay.swift": {
+    "mtime": 1784056310.9865265,
+    "ast_hash": "b9851b4634c2d067f2ee5db35e155b7d",
+    "semantic_hash": "b9851b4634c2d067f2ee5db35e155b7d"
+  },
+  "UI/Components/Shimmer.swift": {
+    "mtime": 1784005466.3295493,
+    "ast_hash": "74ef6c31d553a9f4139291b8a15414f5",
+    "semantic_hash": "74ef6c31d553a9f4139291b8a15414f5"
+  },
+  "UI/HotspotOverlay.swift": {
+    "mtime": 1784909812.6384988,
+    "ast_hash": "8befe7856fb6bd1833c13424dc3ed61a",
+    "semantic_hash": "8befe7856fb6bd1833c13424dc3ed61a"
+  },
+  "UI/LibraryView.swift": {
+    "mtime": 1784152858.3805158,
+    "ast_hash": "6d3a3fed3f01ccbac509b8da7f6cba8a",
+    "semantic_hash": "6d3a3fed3f01ccbac509b8da7f6cba8a"
+  },
+  "UI/LiveMeshPreview.swift": {
+    "mtime": 1784574604.5585432,
+    "ast_hash": "b0f873f5a4dae5f12cfa1bb802bbcf40",
+    "semantic_hash": "b0f873f5a4dae5f12cfa1bb802bbcf40"
+  },
+  "UI/LiveScanner3DView.swift": {
+    "mtime": 1786025329.9125838,
+    "ast_hash": "8b0fb76b6025f2e8597525d9ee7a345d",
+    "semantic_hash": "8b0fb76b6025f2e8597525d9ee7a345d"
+  },
+  "UI/MeshWalkView.swift": {
+    "mtime": 1785127815.001184,
+    "ast_hash": "f48180e26c0160324f50e10ce11d035b",
+    "semantic_hash": "f48180e26c0160324f50e10ce11d035b"
+  },
+  "UI/NodeGalaxyView.swift": {
+    "mtime": 1784063338.1435137,
+    "ast_hash": "1d013543929f4a60b1b845c09300bf50",
+    "semantic_hash": "1d013543929f4a60b1b845c09300bf50"
+  },
+  "UI/OnboardingView.swift": {
+    "mtime": 1786072621.0400136,
+    "ast_hash": "964e2a52db796e580e8b88fa92080510",
+    "semantic_hash": "964e2a52db796e580e8b88fa92080510"
+  },
+  "UI/PanoramaViewerView.swift": {
+    "mtime": 1784092950.9098115,
+    "ast_hash": "17c2a321bca75f1d6ac09eec0008e081",
+    "semantic_hash": "17c2a321bca75f1d6ac09eec0008e081"
+  },
+  "UI/ProgressView360.swift": {
+    "mtime": 1784056314.0387828,
+    "ast_hash": "75944b5b48475c1ed921903cb81a7769",
+    "semantic_hash": "75944b5b48475c1ed921903cb81a7769"
+  },
+  "UI/ProjectDetailView.swift": {
+    "mtime": 1785905853.6122544,
+    "ast_hash": "63e79bdce7b1f39dd543fd38bde0778e",
+    "semantic_hash": "63e79bdce7b1f39dd543fd38bde0778e"
+  },
+  "UI/ReticleView.swift": {
+    "mtime": 1784053688.1808147,
+    "ast_hash": "7c7559f065608ac314f48793e46d6cb8",
+    "semantic_hash": "7c7559f065608ac314f48793e46d6cb8"
+  },
+  "UI/RoomScanSurface.swift": {
+    "mtime": 1785127623.9800012,
+    "ast_hash": "f2577943234a67db1495f91536b30ddd",
+    "semantic_hash": "f2577943234a67db1495f91536b30ddd"
+  },
+  "UI/RoomScanView.swift": {
+    "mtime": 1785820861.3926256,
+    "ast_hash": "a59fe787c5381b1ca5a704792064d3a1",
+    "semantic_hash": "a59fe787c5381b1ca5a704792064d3a1"
+  },
+  "UI/RootView.swift": {
+    "mtime": 1785127887.9686568,
+    "ast_hash": "e0c884592c2c3596dc8e6b537b5fe62e",
+    "semantic_hash": "e0c884592c2c3596dc8e6b537b5fe62e"
+  },
+  "UI/StitchingView.swift": {
+    "mtime": 1785824228.1401334,
+    "ast_hash": "a71d1e638de688b88501c4f57d780b95",
+    "semantic_hash": "a71d1e638de688b88501c4f57d780b95"
+  },
+  "UI/Theme.swift": {
+    "mtime": 1784910203.727253,
+    "ast_hash": "cc6b8e49e4e906d91298924b6b893a54",
+    "semantic_hash": "cc6b8e49e4e906d91298924b6b893a54"
+  },
+  "UI/TourLinkSheet.swift": {
+    "mtime": 1784909790.7212102,
+    "ast_hash": "77e57a8eaa62d399c6ea08230ada76aa",
+    "semantic_hash": "77e57a8eaa62d399c6ea08230ada76aa"
+  },
+  "UI/TourViewerView.swift": {
+    "mtime": 1785820860.3260431,
+    "ast_hash": "dfa5837e8f16a6e36f7f43a6d3022078",
+    "semantic_hash": "dfa5837e8f16a6e36f7f43a6d3022078"
+  },
+  "UI/WalkJoystick.swift": {
+    "mtime": 1785127757.679509,
+    "ast_hash": "1eca248eae7bd41eb6cf9b4b5f6464e2",
+    "semantic_hash": "1eca248eae7bd41eb6cf9b4b5f6464e2"
+  },
+  "Utilities/BlurEstimator.swift": {
+    "mtime": 1783903824.7897923,
+    "ast_hash": "fd539ef99cd61a08ecb91029c7fb5cfe",
+    "semantic_hash": "fd539ef99cd61a08ecb91029c7fb5cfe"
+  },
+  "Utilities/CrashReporter.swift": {
+    "mtime": 1783917162.9467165,
+    "ast_hash": "2dc965b4ff4d8e056140c10fa904c656",
+    "semantic_hash": "2dc965b4ff4d8e056140c10fa904c656"
+  },
+  "Utilities/Haptics.swift": {
+    "mtime": 1784003540.7421398,
+    "ast_hash": "1e31da2a25ff5aa49244e8e3e2073af4",
+    "semantic_hash": "1e31da2a25ff5aa49244e8e3e2073af4"
+  },
+  "Utilities/Logger.swift": {
+    "mtime": 1783920682.553836,
+    "ast_hash": "e0e72808bddb6abdc4cf30a9d5f76043",
+    "semantic_hash": "e0e72808bddb6abdc4cf30a9d5f76043"
+  },
+  "Utilities/Math/Geometry.swift": {
+    "mtime": 1785820870.625977,
+    "ast_hash": "546eccd84e2812e1579774ab8e560743",
+    "semantic_hash": "546eccd84e2812e1579774ab8e560743"
+  },
+  "Utilities/Storage/ImageWriter.swift": {
+    "mtime": 1784062795.9932952,
+    "ast_hash": "098457fd1d900de6481e3fe41a7d330a",
+    "semantic_hash": "098457fd1d900de6481e3fe41a7d330a"
+  },
+  "Utilities/Storage/MeshStore.swift": {
+    "mtime": 1785127499.9936495,
+    "ast_hash": "1b565db0b6c8f9dee8d3828f0dc22ed6",
+    "semantic_hash": "1b565db0b6c8f9dee8d3828f0dc22ed6"
+  },
+  "Utilities/Storage/ProjectStore.swift": {
+    "mtime": 1786593055.1654825,
+    "ast_hash": "6cf4dbf99a8bbf3953795f5f149a0e4f",
+    "semantic_hash": "6cf4dbf99a8bbf3953795f5f149a0e4f"
+  },
+  "Utilities/Storage/SessionStore.swift": {
+    "mtime": 1786593055.1634827,
+    "ast_hash": "c194cb3eddd326889386324151328668",
+    "semantic_hash": "c194cb3eddd326889386324151328668"
+  },
+  "Viewer/MeshCollider.swift": {
+    "mtime": 1785814842.3299246,
+    "ast_hash": "3b20429b3c19c1f577d7b6baf62d3f48",
+    "semantic_hash": "3b20429b3c19c1f577d7b6baf62d3f48"
+  },
+  "Viewer/NodeWorldScene.swift": {
+    "mtime": 1784065910.3629699,
+    "ast_hash": "8efa5d9d75272b7aad62aa889415297c",
+    "semantic_hash": "8efa5d9d75272b7aad62aa889415297c"
+  },
+  "Viewer/PanoramaRenderer.swift": {
+    "mtime": 1784574599.8695905,
+    "ast_hash": "e0fde2bc97f96fc9b6f3f0ea5afe1de6",
+    "semantic_hash": "e0fde2bc97f96fc9b6f3f0ea5afe1de6"
+  },
+  "Viewer/ShaderTypes.h": {
+    "mtime": 1785823944.0355072,
+    "ast_hash": "e1a0ca71757c516cb7a7a07d3afed040",
+    "semantic_hash": "e1a0ca71757c516cb7a7a07d3afed040"
+  },
+  "Viewer/ShaderUniforms.swift": {
+    "mtime": 1785823951.7883713,
+    "ast_hash": "9cfd0fb07e8638fefe6a65f0ad2ce88d",
+    "semantic_hash": "9cfd0fb07e8638fefe6a65f0ad2ce88d"
+  },
+  "Viewer/Shaders.metal": {
+    "mtime": 1783899614.8158,
+    "ast_hash": "1e26410751af12d05a452923df3bda08",
+    "semantic_hash": "1e26410751af12d05a452923df3bda08"
+  },
+  "Viewer/SpatialFragmentRenderer.swift": {
+    "mtime": 1784562041.0205486,
+    "ast_hash": "c51a2aeeaf5ae17445e2bd49a0bbd0f7",
+    "semantic_hash": "c51a2aeeaf5ae17445e2bd49a0bbd0f7"
+  },
+  "Viewer/SphereMesh.swift": {
+    "mtime": 1783899631.8792207,
+    "ast_hash": "8b67d5a57a958df5274c2ad2571e2beb",
+    "semantic_hash": "8b67d5a57a958df5274c2ad2571e2beb"
+  },
+  "Viewer/ViewerEngine.swift": {
+    "mtime": 1784562112.799095,
+    "ast_hash": "2a5c053b032ba41bebd30f94a131016f",
+    "semantic_hash": "2a5c053b032ba41bebd30f94a131016f"
+  }
+}
